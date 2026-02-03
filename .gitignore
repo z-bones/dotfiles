@@ -1,0 +1,23 @@
+# Secrets - keep on USB, never commit
+secrets.tar
+secrets.tar.gpg
+
+# Local overrides
+*.local
+*.local.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temp files
+*.tmp
+*.bak
+*.backup

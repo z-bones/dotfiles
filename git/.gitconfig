@@ -1,0 +1,22 @@
+[user]
+	email = z-bones@users.noreply.github.com
+	name = Zoran
+
+[init]
+	defaultBranch = main
+
+[core]
+	editor = code --wait
+
+[pull]
+	rebase = false
+
+[push]
+	autoSetupRemote = true
+
+[alias]
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+	lg = log --oneline --graph --decorate -10

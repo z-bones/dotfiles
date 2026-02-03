@@ -1,0 +1,44 @@
+# Alacritty Configuration
+
+[window]
+padding = { x = 14, y = 12 }
+
+[font]
+normal = { family = "JetBrains Mono", style = "Regular" }
+size = 10.5
+
+[colors]
+[colors.primary]
+background = "#000000"
+foreground = "#ffffff"
+
+[colors.cursor]
+cursor = "#f81ce5"
+text = "#000000"
+
+[colors.selection]
+background = "#4a0944"
+text = "#ffffff"
+
+[colors.normal]
+black = "#000000"
+red = "#C51E14"
+green = "#1DC121"
+yellow = "#C7C329"
+blue = "#0A2FC4"
+magenta = "#C839C5"
+cyan = "#20C5C6"
+white = "#C7C7C7"
+
+[colors.bright]
+black = "#686868"
+red = "#FD6F6B"
+green = "#67F86F"
+yellow = "#FFFA72"
+blue = "#6A76FB"
+magenta = "#FD7CFC"
+cyan = "#68FDFE"
+white = "#FFFFFF"
+
+[cursor]
+style = { shape = "Block", blinking = "Off" }

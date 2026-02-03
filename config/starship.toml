@@ -1,0 +1,19 @@
+# Starship Prompt Configuration
+
+# Remove the newline between prompt info and input
+[line_break]
+disabled = true
+
+# Show full path instead of just current folder
+[directory]
+truncation_length = 0
+truncate_to_repo = false
+
+# Git status
+[git_status]
+style = "bold yellow"
+
+# Command duration - only show if command takes > 2 seconds
+[cmd_duration]
+min_time = 2000
+show_milliseconds = false

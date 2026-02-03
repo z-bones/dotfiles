@@ -1,0 +1,386 @@
+#!/usr/bin/env bash
+# Development tools installation
+
+set -euo pipefail
+
+# NVM - Node Version Manager
+install_nvm() {
+    if [ -d "$HOME/.nvm" ]; then
+        print_success "nvm already installed"
+    else
+        print_header "Installing nvm..."
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    fi
+
+    # Load nvm for this session (disable strict mode - nvm.sh isn't compatible)
+    export NVM_DIR="$HOME/.nvm"
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        set +u
+        \. "$NVM_DIR/nvm.sh"
+        set -u
+    fi
+
+    # Install Node.js if not present
+    if ! command -v node &> /dev/null; then
+        print_header "Installing Node.js LTS..."
+        set +u
+        nvm install --lts
+        nvm use --lts
+        set -u
+
+        # Install global packages
+        print_header "Installing global npm packages..."
+        npm install -g yarn @anthropic-ai/claude-code vercel
+    else
+        print_success "Node.js already installed"
+    fi
+}
+
+# Rust via rustup
+install_rust() {
+    if command -v rustc &> /dev/null; then
+        print_success "Rust already installed"
+    else
+        print_header "Installing Rust via rustup..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source "$HOME/.cargo/env"
+    fi
+}
+
+# Starship prompt
+install_starship() {
+    if command -v starship &> /dev/null; then
+        print_success "Starship already installed"
+    else
+        print_header "Installing Starship prompt..."
+        curl -sS https://starship.rs/install.sh | sh -s -- -y
+    fi
+}
+
+# Alacritty terminal (via cargo)
+install_alacritty() {
+    # Skip in containers (GUI app, requires OpenGL)
+    if [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then
+        print_warning "Running in container, skipping Alacritty installation"
+        return 0
+    fi
+
+    if command -v alacritty &> /dev/null; then
+        print_success "Alacritty already installed"
+    else
+        print_header "Installing Alacritty via cargo..."
+
+        # Install dependencies based on distro
+        case "${DISTRO:-unknown}" in
+            debian)
+                sudo apt install -y cmake pkg-config libfreetype6-dev libfontconfig1-dev \
+                    libxcb-xfixes0-dev libxkbcommon-dev python3 scdoc
+                ;;
+            fedora)
+                sudo dnf install -y cmake freetype-devel fontconfig-devel \
+                    libxcb-devel libxkbcommon-devel scdoc
+                ;;
+            arch)
+                sudo pacman -S --noconfirm cmake freetype2 fontconfig pkg-config make \
+                    libxcb libxkbcommon python scdoc
+                ;;
+        esac
+
+        cargo install alacritty
+
+        # Add desktop entry
+        if [ -f "$HOME/.cargo/bin/alacritty" ]; then
+            mkdir -p ~/.local/share/applications
+            cat > ~/.local/share/applications/alacritty.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Alacritty
+GenericName=Terminal
+Comment=A fast, cross-platform, OpenGL terminal emulator
+Exec=alacritty
+Icon=alacritty
+Terminal=false
+Categories=System;TerminalEmulator;
+EOF
+        fi
+    fi
+}
+
+# Fisher - Fish plugin manager
+install_fisher() {
+    if [ -f "$HOME/.config/fish/functions/fisher.fish" ]; then
+        print_success "Fisher already installed"
+    else
+        print_header "Installing Fisher..."
+        fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher"
+
+        # Install plugins from fish_plugins if it exists
+        if [ -f "$HOME/.config/fish/fish_plugins" ]; then
+            print_header "Installing Fish plugins..."
+            fish -c "fisher update"
+        fi
+    fi
+}
+
+# GitHub CLI
+install_gh() {
+    if command -v gh &> /dev/null; then
+        print_success "GitHub CLI already installed"
+    else
+        print_header "Installing GitHub CLI..."
+        case "${DISTRO:-unknown}" in
+            debian)
+                curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+                sudo apt update
+                sudo apt install -y gh
+                ;;
+            fedora)
+                sudo dnf install -y gh
+                ;;
+            arch)
+                sudo pacman -S --noconfirm github-cli
+                ;;
+        esac
+    fi
+}
+
+# Docker
+install_docker() {
+    # Skip in containers (Docker-in-Docker requires special setup)
+    if [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then
+        print_warning "Running in container, skipping Docker installation"
+        return 0
+    fi
+
+    if command -v docker &> /dev/null; then
+        print_success "Docker already installed"
+    else
+        print_header "Installing Docker..."
+        case "${DISTRO:-unknown}" in
+            debian)
+                # Add Docker's official GPG key and repository
+                sudo apt install -y ca-certificates
+                sudo install -m 0755 -d /etc/apt/keyrings
+                curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+                sudo chmod a+r /etc/apt/keyrings/docker.gpg
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+                sudo apt update
+                sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                ;;
+            fedora)
+                sudo dnf install -y dnf-plugins-core
+                sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+                sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                ;;
+            arch)
+                sudo pacman -S --noconfirm docker docker-compose
+                ;;
+        esac
+
+        # Add user to docker group
+        sudo usermod -aG docker "$USER"
+        sudo systemctl enable docker
+        sudo systemctl start docker
+        print_warning "Log out and back in for docker group membership to take effect"
+    fi
+}
+
+# Supabase CLI
+install_supabase() {
+    if command -v supabase &> /dev/null; then
+        print_success "Supabase CLI already installed"
+    else
+        print_header "Installing Supabase CLI..."
+        # Download from GitHub releases (npm global no longer supported)
+        local version
+        version=$(curl -fsSL https://api.github.com/repos/supabase/cli/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
+        version="${version#v}"  # Remove 'v' prefix if present
+
+        if [ -z "$version" ]; then
+            print_warning "Could not detect Supabase version, skipping"
+            return 0
+        fi
+
+        local tmp_dir
+        tmp_dir=$(mktemp -d)
+        cd "$tmp_dir"
+
+        case "${DISTRO:-unknown}" in
+            debian)
+                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_amd64.deb" -o supabase.deb; then
+                    sudo dpkg -i supabase.deb || print_warning "Failed to install Supabase"
+                else
+                    print_warning "Failed to download Supabase CLI"
+                fi
+                ;;
+            fedora)
+                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_amd64.rpm" -o supabase.rpm; then
+                    sudo rpm -i supabase.rpm || print_warning "Failed to install Supabase"
+                else
+                    print_warning "Failed to download Supabase CLI"
+                fi
+                ;;
+            arch)
+                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_amd64.pkg.tar.zst" -o supabase.pkg.tar.zst; then
+                    sudo pacman -U --noconfirm supabase.pkg.tar.zst || print_warning "Failed to install Supabase"
+                else
+                    print_warning "Failed to download Supabase CLI"
+                fi
+                ;;
+            *)
+                print_warning "Unknown distro, skipping Supabase CLI"
+                ;;
+        esac
+
+        cd - > /dev/null
+        rm -rf "$tmp_dir"
+    fi
+}
+
+# AWS CLI v2
+install_aws() {
+    if command -v aws &> /dev/null; then
+        print_success "AWS CLI already installed"
+    else
+        print_header "Installing AWS CLI v2..."
+        local tmp_dir
+        tmp_dir=$(mktemp -d)
+        cd "$tmp_dir"
+        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip -q awscliv2.zip
+        sudo ./aws/install
+        cd - > /dev/null
+        rm -rf "$tmp_dir"
+    fi
+}
+
+# Cursor IDE (AppImage)
+install_cursor() {
+    # Skip in containers (AppImages require FUSE)
+    if [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then
+        print_warning "Running in container, skipping Cursor installation"
+        return 0
+    fi
+
+    local cursor_dir="$HOME/.local/bin"
+    local cursor_path="$cursor_dir/cursor.AppImage"
+
+    if [ -f "$cursor_path" ]; then
+        print_success "Cursor already installed"
+    else
+        print_header "Installing Cursor IDE..."
+        mkdir -p "$cursor_dir"
+
+        # Get latest AppImage URL from Cursor's download API
+        local download_url
+        download_url=$(curl -fsSL "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" | grep -o '"downloadUrl":"[^"]*"' | cut -d'"' -f4)
+
+        if [ -z "$download_url" ]; then
+            print_error "Failed to fetch Cursor download URL"
+            return 1
+        fi
+
+        # Download latest Cursor AppImage
+        curl -fSL "$download_url" -o "$cursor_path"
+        chmod +x "$cursor_path"
+
+        # Create desktop entry
+        mkdir -p ~/.local/share/applications
+        cat > ~/.local/share/applications/cursor.desktop << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Cursor
+GenericName=Code Editor
+Comment=AI-powered code editor
+Exec=cursor.AppImage %F
+Icon=cursor
+Terminal=false
+Categories=Development;IDE;TextEditor;
+MimeType=text/plain;inode/directory;
+StartupWMClass=Cursor
+EOF
+
+        print_success "Cursor installed to $cursor_path"
+    fi
+}
+
+# SynthWave '84 Dark theme for VS Code/Cursor
+install_synthwave_theme() {
+    # Extension folder must be named publisher.extension-name for VS Code/Cursor to recognize it
+    local vscode_ext="$HOME/.vscode/extensions/z-bones.synthwave-dark"
+    local cursor_ext="$HOME/.cursor/extensions/z-bones.synthwave-dark"
+    local repo_url="https://github.com/z-bones/synthwave-dark.git"
+
+    if [ -d "$vscode_ext" ] || [ -d "$cursor_ext" ]; then
+        print_success "SynthWave '84 Dark theme already installed"
+    else
+        print_header "Installing SynthWave '84 Dark theme..."
+
+        # Install for VS Code
+        if [ -d "$HOME/.vscode/extensions" ]; then
+            git clone "$repo_url" "$vscode_ext" || print_warning "Failed to install for VS Code"
+        fi
+
+        # Install for Cursor
+        if [ -d "$HOME/.cursor/extensions" ]; then
+            git clone "$repo_url" "$cursor_ext" || print_warning "Failed to install for Cursor"
+        fi
+
+        print_success "SynthWave '84 Dark theme installed"
+    fi
+}
+
+# VS Code / Cursor extensions
+install_vscode_extensions() {
+    local extensions_file="$DOTFILES_DIR/config/vscode/extensions.txt"
+
+    if [ ! -f "$extensions_file" ]; then
+        print_warning "Extensions file not found: $extensions_file"
+        return 1
+    fi
+
+    print_header "Installing VS Code extensions..."
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        # Skip comments and empty lines
+        [[ "$line" =~ ^#.*$ ]] && continue
+        [[ -z "${line// }" ]] && continue
+
+        local ext="$line"
+
+        # Install for VS Code if available
+        if command -v code &> /dev/null; then
+            if ! code --list-extensions | grep -qi "^${ext}$"; then
+                echo "Installing $ext for VS Code..."
+                code --install-extension "$ext" --force || print_warning "Failed to install $ext"
+            fi
+        fi
+
+        # Install for Cursor if available
+        if command -v cursor &> /dev/null; then
+            if ! cursor --list-extensions 2>/dev/null | grep -qi "^${ext}$"; then
+                echo "Installing $ext for Cursor..."
+                cursor --install-extension "$ext" --force 2>/dev/null || true
+            fi
+        fi
+    done < "$extensions_file"
+
+    print_success "VS Code extensions installed"
+}
+
+# Main
+install_nvm
+install_rust
+install_starship
+install_alacritty
+install_fisher
+install_gh
+install_docker
+install_supabase
+install_aws
+install_cursor
+install_synthwave_theme
+install_vscode_extensions
+
+print_success "Development tools installation complete"
