@@ -411,9 +411,10 @@ install_extension_direct() {
     local tmp_dir
     tmp_dir=$(mktemp -d)
 
+    echo "  Downloading $ext_id..."
     if curl -fSL --compressed --retry 2 "$download_url" -o "$tmp_dir/extension.vsix" 2>/dev/null; then
         # VSIX may be gzipped, check and decompress if needed
-        if file "$tmp_dir/extension.vsix" 2>/dev/null | grep -q gzip; then
+        if command -v file &>/dev/null && file "$tmp_dir/extension.vsix" 2>/dev/null | grep -q gzip; then
             mv "$tmp_dir/extension.vsix" "$tmp_dir/extension.vsix.gz"
             gunzip "$tmp_dir/extension.vsix.gz" 2>/dev/null || true
         fi
@@ -430,7 +431,7 @@ install_extension_direct() {
             cp -r "$tmp_dir/extracted/extension/"* "$target_path/"
             echo "  Installed ${ext_id}-${version}"
         else
-            print_warning "Failed to extract $ext_id"
+            print_warning "Failed to extract $ext_id (file type: $(file "$tmp_dir/extension.vsix" 2>/dev/null || echo 'unknown'))"
         fi
     else
         print_warning "Failed to download $ext_id"
