@@ -400,10 +400,9 @@ install_extension_direct() {
     local ext_dir="$2"
     local publisher="${ext_id%%.*}"
     local extension="${ext_id#*.}"
-    local target_path="$ext_dir/$ext_id"
 
     # Skip if already installed (check for any version)
-    if ls -d "$ext_dir/${ext_id}"* &>/dev/null 2>&1; then
+    if ls -d "$ext_dir/${ext_id}-"* &>/dev/null 2>&1; then
         return 0
     fi
 
@@ -414,14 +413,20 @@ install_extension_direct() {
 
     if curl -fSL --retry 2 "$download_url" -o "$tmp_dir/extension.vsix" 2>/dev/null; then
         # VSIX is just a zip file
-        mkdir -p "$target_path"
         unzip -q "$tmp_dir/extension.vsix" -d "$tmp_dir/extracted" 2>/dev/null
         if [ -d "$tmp_dir/extracted/extension" ]; then
+            # Extract version from package.json for proper directory naming
+            local version
+            version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$tmp_dir/extracted/extension/package.json" 2>/dev/null | head -1 | cut -d'"' -f4)
+            if [ -z "$version" ]; then
+                version="0.0.0"
+            fi
+            local target_path="$ext_dir/${ext_id}-${version}"
+            mkdir -p "$target_path"
             cp -r "$tmp_dir/extracted/extension/"* "$target_path/"
-            echo "  Installed $ext_id"
+            echo "  Installed ${ext_id}-${version}"
         else
             print_warning "Failed to extract $ext_id"
-            rm -rf "$target_path"
         fi
     else
         print_warning "Failed to download $ext_id"
