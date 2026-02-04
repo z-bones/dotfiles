@@ -411,7 +411,12 @@ install_extension_direct() {
     local tmp_dir
     tmp_dir=$(mktemp -d)
 
-    if curl -fSL --retry 2 "$download_url" -o "$tmp_dir/extension.vsix" 2>/dev/null; then
+    if curl -fSL --compressed --retry 2 "$download_url" -o "$tmp_dir/extension.vsix" 2>/dev/null; then
+        # VSIX may be gzipped, check and decompress if needed
+        if file "$tmp_dir/extension.vsix" 2>/dev/null | grep -q gzip; then
+            mv "$tmp_dir/extension.vsix" "$tmp_dir/extension.vsix.gz"
+            gunzip "$tmp_dir/extension.vsix.gz" 2>/dev/null || true
+        fi
         # VSIX is just a zip file
         if unzip -q "$tmp_dir/extension.vsix" -d "$tmp_dir/extracted" 2>/dev/null && [ -d "$tmp_dir/extracted/extension" ]; then
             # Extract version from package.json for proper directory naming
