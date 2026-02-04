@@ -1,5 +1,8 @@
 # Alacritty Configuration
 
+[terminal.shell]
+program = "/bin/zsh"
+
 [window]
 padding = { x = 14, y = 12 }
 
