@@ -369,28 +369,42 @@ EOF
 
 # SynthWave '84 Dark theme for VS Code/Cursor
 install_synthwave_theme() {
-    # Extension folder must be named publisher.extension-name for VS Code/Cursor to recognize it
-    local vscode_ext="$HOME/.vscode/extensions/z-bones.synthwave-dark"
-    local cursor_ext="$HOME/.cursor/extensions/z-bones.synthwave-dark"
+    local ext_id="z-bones.synthwave-dark"
     local repo_url="https://github.com/z-bones/synthwave-dark.git"
 
-    if [ -d "$vscode_ext" ] || [ -d "$cursor_ext" ]; then
+    # Check if already installed (with version suffix)
+    if ls -d "$HOME/.vscode/extensions/${ext_id}-"* &>/dev/null 2>&1 || \
+       ls -d "$HOME/.cursor/extensions/${ext_id}-"* &>/dev/null 2>&1; then
         print_success "SynthWave '84 Dark theme already installed"
-    else
-        print_header "Installing SynthWave '84 Dark theme..."
+        return 0
+    fi
+
+    # Remove old installs without version suffix
+    rm -rf "$HOME/.vscode/extensions/$ext_id" "$HOME/.cursor/extensions/$ext_id" 2>/dev/null
+
+    print_header "Installing SynthWave '84 Dark theme..."
+
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+    if git clone --depth 1 "$repo_url" "$tmp_dir/theme" 2>/dev/null; then
+        local version
+        version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$tmp_dir/theme/package.json" 2>/dev/null | head -1 | cut -d'"' -f4 || echo "1.0.0")
+        [ -z "$version" ] && version="1.0.0"
 
         # Install for VS Code
         if [ -d "$HOME/.vscode/extensions" ]; then
-            git clone "$repo_url" "$vscode_ext" || print_warning "Failed to install for VS Code"
+            cp -r "$tmp_dir/theme" "$HOME/.vscode/extensions/${ext_id}-${version}"
         fi
 
         # Install for Cursor
-        if [ -d "$HOME/.cursor/extensions" ]; then
-            git clone "$repo_url" "$cursor_ext" || print_warning "Failed to install for Cursor"
-        fi
+        mkdir -p "$HOME/.cursor/extensions"
+        cp -r "$tmp_dir/theme" "$HOME/.cursor/extensions/${ext_id}-${version}"
 
-        print_success "SynthWave '84 Dark theme installed"
+        print_success "SynthWave '84 Dark theme installed (${version})"
+    else
+        print_warning "Failed to clone SynthWave theme"
     fi
+    rm -rf "$tmp_dir"
 }
 
 # Download and install a VS Code extension directly from marketplace
