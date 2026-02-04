@@ -57,6 +57,34 @@ install_starship() {
     fi
 }
 
+# JetBrainsMono Nerd Font
+install_fonts() {
+    local font_dir="$HOME/.local/share/fonts"
+    local font_name="JetBrainsMono"
+
+    if fc-list | grep -qi "JetBrainsMono Nerd Font"; then
+        print_success "JetBrainsMono Nerd Font already installed"
+    else
+        print_header "Installing JetBrainsMono Nerd Font..."
+        mkdir -p "$font_dir"
+
+        local tmp_dir
+        tmp_dir=$(mktemp -d)
+        cd "$tmp_dir"
+
+        if curl -fsSL "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/${font_name}.zip" -o "${font_name}.zip"; then
+            unzip -q "${font_name}.zip" -d "$font_dir"
+            fc-cache -f
+            print_success "JetBrainsMono Nerd Font installed"
+        else
+            print_warning "Failed to download JetBrainsMono Nerd Font"
+        fi
+
+        cd - > /dev/null
+        rm -rf "$tmp_dir"
+    fi
+}
+
 # Alacritty terminal (via cargo)
 install_alacritty() {
     # Skip in containers (GUI app, requires OpenGL)
@@ -414,6 +442,7 @@ install_vscode_extensions() {
 install_nvm
 install_rust
 install_starship
+install_fonts
 install_alacritty
 install_fisher
 install_gh
