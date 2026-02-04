@@ -413,11 +413,10 @@ install_extension_direct() {
 
     if curl -fSL --retry 2 "$download_url" -o "$tmp_dir/extension.vsix" 2>/dev/null; then
         # VSIX is just a zip file
-        unzip -q "$tmp_dir/extension.vsix" -d "$tmp_dir/extracted" 2>/dev/null
-        if [ -d "$tmp_dir/extracted/extension" ]; then
+        if unzip -q "$tmp_dir/extension.vsix" -d "$tmp_dir/extracted" 2>/dev/null && [ -d "$tmp_dir/extracted/extension" ]; then
             # Extract version from package.json for proper directory naming
             local version
-            version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$tmp_dir/extracted/extension/package.json" 2>/dev/null | head -1 | cut -d'"' -f4)
+            version=$(grep -o '"version"[[:space:]]*:[[:space:]]*"[^"]*"' "$tmp_dir/extracted/extension/package.json" 2>/dev/null | head -1 | cut -d'"' -f4 || echo "0.0.0")
             if [ -z "$version" ]; then
                 version="0.0.0"
             fi
