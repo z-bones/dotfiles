@@ -28,19 +28,8 @@ link_file() {
 
 print_header "Creating config symlinks..."
 
-# Fish shell
-link_file "$DOTFILES_DIR/shell/fish/config.fish" "$HOME/.config/fish/config.fish"
-link_file "$DOTFILES_DIR/shell/fish/fish_plugins" "$HOME/.config/fish/fish_plugins"
-
-# Link fish conf.d files if they exist
-if [ -d "$DOTFILES_DIR/shell/fish/conf.d" ]; then
-    mkdir -p "$HOME/.config/fish/conf.d"
-    for f in "$DOTFILES_DIR/shell/fish/conf.d"/*; do
-        if [ -f "$f" ]; then
-            link_file "$f" "$HOME/.config/fish/conf.d/$(basename "$f")"
-        fi
-    done
-fi
+# Zsh
+link_file "$DOTFILES_DIR/shell/zsh/.zshrc" "$HOME/.zshrc"
 
 # Bash
 link_file "$DOTFILES_DIR/shell/bash/.bashrc" "$HOME/.bashrc"

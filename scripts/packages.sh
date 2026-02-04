@@ -5,7 +5,7 @@ set -euo pipefail
 
 # Base packages needed on all distros
 COMMON_PACKAGES=(
-    fish
+    zsh
     git
     curl
     wget

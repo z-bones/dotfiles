@@ -27,12 +27,14 @@ install_nvm() {
         nvm install --lts
         nvm use --lts
         set -u
-
-        # Install global packages
-        print_header "Installing global npm packages..."
-        npm install -g yarn @anthropic-ai/claude-code vercel
     else
         print_success "Node.js already installed"
+    fi
+
+    # Install global npm packages (always ensure they're present)
+    if command -v npm &> /dev/null; then
+        print_header "Installing global npm packages..."
+        npm install -g yarn @anthropic-ai/claude-code vercel 2>/dev/null || print_warning "Some npm packages failed to install"
     fi
 }
 
@@ -142,36 +144,6 @@ Terminal=false
 Categories=System;TerminalEmulator;
 EOF
         fi
-    fi
-}
-
-# Fisher - Fish plugin manager
-install_fisher() {
-    if [ -f "$HOME/.config/fish/functions/fisher.fish" ]; then
-        print_success "Fisher already installed"
-    else
-        print_header "Installing Fisher..."
-        fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher"
-    fi
-
-    # Install plugins from fish_plugins (check dotfiles location too since symlinks may not exist yet)
-    local plugins_file=""
-    if [ -f "$HOME/.config/fish/fish_plugins" ]; then
-        plugins_file="$HOME/.config/fish/fish_plugins"
-    elif [ -f "$DOTFILES_DIR/shell/fish/fish_plugins" ]; then
-        plugins_file="$DOTFILES_DIR/shell/fish/fish_plugins"
-    fi
-
-    if [ -n "$plugins_file" ]; then
-        print_header "Installing Fish plugins..."
-        mkdir -p "$HOME/.config/fish"
-        # Install each plugin from the file
-        while IFS= read -r plugin || [ -n "$plugin" ]; do
-            # Skip empty lines and comments
-            [[ -z "$plugin" || "$plugin" =~ ^# ]] && continue
-            echo "Installing fish plugin: $plugin"
-            fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install $plugin" || true
-        done < "$plugins_file"
     fi
 }
 
@@ -458,7 +430,6 @@ install_rust
 install_starship
 install_fonts
 install_alacritty
-install_fisher
 install_gh
 install_docker
 install_supabase

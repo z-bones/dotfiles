@@ -180,16 +180,16 @@ if [ -f "$DOTFILES_DIR/secrets/secrets.tar.gpg" ]; then
     fi
 fi
 
-# Set fish as default shell
-if command -v fish &> /dev/null; then
-    FISH_PATH=$(which fish)
-    if [ "$SHELL" != "$FISH_PATH" ]; then
-        print_header "Setting fish as default shell..."
-        if ! grep -q "$FISH_PATH" /etc/shells; then
-            echo "$FISH_PATH" | sudo tee -a /etc/shells
+# Set zsh as default shell
+if command -v zsh &> /dev/null; then
+    ZSH_PATH=$(which zsh)
+    if [ "$SHELL" != "$ZSH_PATH" ]; then
+        print_header "Setting zsh as default shell..."
+        if ! grep -q "$ZSH_PATH" /etc/shells; then
+            echo "$ZSH_PATH" | sudo tee -a /etc/shells
         fi
-        chsh -s "$FISH_PATH"
-        print_success "Default shell changed to fish (restart terminal to apply)"
+        chsh -s "$ZSH_PATH"
+        print_success "Default shell changed to zsh (restart terminal to apply)"
     fi
 fi
 
@@ -202,5 +202,5 @@ print_success "Development tools ready"
 echo ""
 print_warning "Manual steps remaining:"
 echo "  1. Download DaVinci Resolve from https://www.blackmagicdesign.com/products/davinciresolve"
-echo "  2. Restart your terminal or run: exec fish"
+echo "  2. Restart your terminal or run: exec zsh"
 echo ""
