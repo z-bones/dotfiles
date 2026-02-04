@@ -16,7 +16,6 @@ COMMON_PACKAGES=(
     htop
     tree
     tmux
-    ffmpeg
 )
 
 # Flatpak apps to install
