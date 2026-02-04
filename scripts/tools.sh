@@ -132,13 +132,13 @@ install_alacritty() {
         # Add desktop entry
         if [ -f "$HOME/.cargo/bin/alacritty" ]; then
             mkdir -p ~/.local/share/applications
-            cat > ~/.local/share/applications/alacritty.desktop << 'EOF'
+            cat > ~/.local/share/applications/alacritty.desktop << EOF
 [Desktop Entry]
 Type=Application
 Name=Alacritty
 GenericName=Terminal
 Comment=A fast, cross-platform, OpenGL terminal emulator
-Exec=alacritty
+Exec=$HOME/.cargo/bin/alacritty
 Icon=alacritty
 Terminal=false
 Categories=System;TerminalEmulator;
@@ -342,13 +342,13 @@ install_cursor() {
 
         # Create desktop entry
         mkdir -p ~/.local/share/applications
-        cat > ~/.local/share/applications/cursor.desktop << 'EOF'
+        cat > ~/.local/share/applications/cursor.desktop << EOF
 [Desktop Entry]
 Type=Application
 Name=Cursor
 GenericName=Code Editor
 Comment=AI-powered code editor
-Exec=cursor.AppImage %F
+Exec=$cursor_path %F
 Icon=cursor
 Terminal=false
 Categories=Development;IDE;TextEditor;
