@@ -71,14 +71,25 @@ install_alacritty() {
         print_header "Installing Alacritty via cargo..."
 
         # Install dependencies based on distro
+        local alacritty_deps=(cmake freetype-devel fontconfig-devel libxcb-devel libxkbcommon-devel scdoc)
         case "${DISTRO:-unknown}" in
             debian)
                 sudo apt install -y cmake pkg-config libfreetype6-dev libfontconfig1-dev \
                     libxcb-xfixes0-dev libxkbcommon-dev python3 scdoc
                 ;;
             fedora)
-                sudo dnf install -y cmake freetype-devel fontconfig-devel \
-                    libxcb-devel libxkbcommon-devel scdoc
+                case "$(detect_fedora_pkg_mgr)" in
+                    rpm-ostree)
+                        sudo rpm-ostree install -y --allow-inactive --idempotent "${alacritty_deps[@]}"
+                        print_warning "Alacritty deps require reboot before cargo install will work"
+                        ;;
+                    dnf5)
+                        sudo dnf5 install -y "${alacritty_deps[@]}"
+                        ;;
+                    dnf)
+                        sudo dnf install -y "${alacritty_deps[@]}"
+                        ;;
+                esac
                 ;;
             arch)
                 sudo pacman -S --noconfirm cmake freetype2 fontconfig pkg-config make \
@@ -136,7 +147,17 @@ install_gh() {
                 sudo apt install -y gh
                 ;;
             fedora)
-                sudo dnf install -y gh
+                case "$(detect_fedora_pkg_mgr)" in
+                    rpm-ostree)
+                        sudo rpm-ostree install -y --allow-inactive --idempotent gh
+                        ;;
+                    dnf5)
+                        sudo dnf5 install -y gh
+                        ;;
+                    dnf)
+                        sudo dnf install -y gh
+                        ;;
+                esac
                 ;;
             arch)
                 sudo pacman -S --noconfirm github-cli
@@ -169,9 +190,22 @@ install_docker() {
                 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
                 ;;
             fedora)
-                sudo dnf install -y dnf-plugins-core
-                sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
-                sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                case "$(detect_fedora_pkg_mgr)" in
+                    rpm-ostree)
+                        print_warning "Skipping Docker on immutable Fedora - use podman instead (pre-installed)"
+                        return 0
+                        ;;
+                    dnf5)
+                        sudo dnf5 install -y dnf5-plugins
+                        sudo dnf5 config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo
+                        sudo dnf5 install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                        ;;
+                    dnf)
+                        sudo dnf install -y dnf-plugins-core
+                        sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+                        sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+                        ;;
+                esac
                 ;;
             arch)
                 sudo pacman -S --noconfirm docker docker-compose
@@ -216,7 +250,14 @@ install_supabase() {
                 ;;
             fedora)
                 if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_amd64.rpm" -o supabase.rpm; then
-                    sudo rpm -i supabase.rpm || print_warning "Failed to install Supabase"
+                    case "$(detect_fedora_pkg_mgr)" in
+                        rpm-ostree)
+                            sudo rpm-ostree install -y --allow-inactive "$(pwd)/supabase.rpm" || print_warning "Failed to install Supabase"
+                            ;;
+                        *)
+                            sudo rpm -i supabase.rpm || print_warning "Failed to install Supabase"
+                            ;;
+                    esac
                 else
                     print_warning "Failed to download Supabase CLI"
                 fi
