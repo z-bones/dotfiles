@@ -50,6 +50,19 @@ detect_distro() {
     fi
 }
 
+# Detect Fedora package manager (rpm-ostree for immutable, dnf5/dnf for traditional)
+detect_fedora_pkg_mgr() {
+    if command -v rpm-ostree &> /dev/null && rpm-ostree status &> /dev/null; then
+        echo "rpm-ostree"
+    elif command -v dnf5 &> /dev/null; then
+        echo "dnf5"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    else
+        echo "unknown"
+    fi
+}
+
 DISTRO=$(detect_distro)
 
 print_header "Dotfiles Bootstrap"
@@ -73,7 +86,22 @@ bootstrap_deps() {
             sudo apt install -y "${missing[@]}"
             ;;
         fedora)
-            sudo dnf install -y "${missing[@]}"
+            case "$(detect_fedora_pkg_mgr)" in
+                rpm-ostree)
+                    sudo rpm-ostree install -y --allow-inactive "${missing[@]}"
+                    print_warning "Reboot required for changes to take effect"
+                    ;;
+                dnf5)
+                    sudo dnf5 install -y "${missing[@]}"
+                    ;;
+                dnf)
+                    sudo dnf install -y "${missing[@]}"
+                    ;;
+                *)
+                    print_error "No supported package manager found (dnf, dnf5, or rpm-ostree)"
+                    exit 1
+                    ;;
+            esac
             ;;
         arch)
             sudo pacman -Sy --noconfirm "${missing[@]}"

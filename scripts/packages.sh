@@ -40,8 +40,28 @@ install_debian() {
 }
 
 install_fedora() {
-    print_header "Installing packages via dnf..."
-    sudo dnf install -y "${COMMON_PACKAGES[@]}" @development-tools flatpak
+    local pkg_mgr
+    pkg_mgr=$(detect_fedora_pkg_mgr)
+    print_header "Installing packages via $pkg_mgr..."
+
+    case "$pkg_mgr" in
+        rpm-ostree)
+            # rpm-ostree doesn't support groups like @development-tools
+            # flatpak is pre-installed on immutable Fedora
+            sudo rpm-ostree install -y --allow-inactive --idempotent "${COMMON_PACKAGES[@]}"
+            print_warning "System packages will be available after reboot"
+            ;;
+        dnf5)
+            sudo dnf5 install -y "${COMMON_PACKAGES[@]}" @development-tools flatpak
+            ;;
+        dnf)
+            sudo dnf install -y "${COMMON_PACKAGES[@]}" @development-tools flatpak
+            ;;
+        *)
+            print_error "No supported package manager found"
+            return 1
+            ;;
+    esac
 
     # Flathub should be available by default on Fedora, but ensure it's there
     if ! flatpak remotes | grep -q flathub; then
