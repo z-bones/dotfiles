@@ -155,18 +155,23 @@ install_fisher() {
     fi
 
     # Install plugins from fish_plugins (check dotfiles location too since symlinks may not exist yet)
-    local plugins_file="$HOME/.config/fish/fish_plugins"
-    if [ ! -f "$plugins_file" ] && [ -f "$DOTFILES_DIR/shell/fish/fish_plugins" ]; then
+    local plugins_file=""
+    if [ -f "$HOME/.config/fish/fish_plugins" ]; then
+        plugins_file="$HOME/.config/fish/fish_plugins"
+    elif [ -f "$DOTFILES_DIR/shell/fish/fish_plugins" ]; then
         plugins_file="$DOTFILES_DIR/shell/fish/fish_plugins"
     fi
 
-    if [ -f "$plugins_file" ]; then
+    if [ -n "$plugins_file" ]; then
         print_header "Installing Fish plugins..."
-        # Copy plugins file if not in place yet
         mkdir -p "$HOME/.config/fish"
-        cp "$plugins_file" "$HOME/.config/fish/fish_plugins" 2>/dev/null || true
-        # Source fisher before running update (needed in fresh subshell)
-        fish -c "source ~/.config/fish/functions/fisher.fish; fisher update"
+        # Install each plugin from the file
+        while IFS= read -r plugin || [ -n "$plugin" ]; do
+            # Skip empty lines and comments
+            [[ -z "$plugin" || "$plugin" =~ ^# ]] && continue
+            echo "Installing fish plugin: $plugin"
+            fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install $plugin" || true
+        done < "$plugins_file"
     fi
 }
 
