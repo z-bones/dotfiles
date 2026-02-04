@@ -165,7 +165,8 @@ install_fisher() {
         # Copy plugins file if not in place yet
         mkdir -p "$HOME/.config/fish"
         cp "$plugins_file" "$HOME/.config/fish/fish_plugins" 2>/dev/null || true
-        fish -c "fisher update"
+        # Source fisher before running update (needed in fresh subshell)
+        fish -c "source ~/.config/fish/functions/fisher.fish; fisher update"
     fi
 }
 
