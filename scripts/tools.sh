@@ -323,6 +323,10 @@ install_cursor() {
 
     if [ -f "$cursor_path" ]; then
         print_success "Cursor already installed"
+        # Ensure symlink exists (may be missing from older installs)
+        if [ ! -L "$cursor_dir/cursor" ]; then
+            ln -sf "$cursor_path" "$cursor_dir/cursor"
+        fi
     else
         print_header "Installing Cursor IDE..."
         mkdir -p "$cursor_dir"
@@ -339,6 +343,9 @@ install_cursor() {
         # Download latest Cursor AppImage
         curl -fSL "$download_url" -o "$cursor_path"
         chmod +x "$cursor_path"
+
+        # Create symlink so 'cursor' command works (for extension installation, etc.)
+        ln -sf "$cursor_path" "$cursor_dir/cursor"
 
         # Create desktop entry
         mkdir -p ~/.local/share/applications
