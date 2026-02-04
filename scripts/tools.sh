@@ -393,6 +393,43 @@ install_synthwave_theme() {
     fi
 }
 
+# Download and install a VS Code extension directly from marketplace
+# Usage: install_extension_direct <publisher.extension> <target_dir>
+install_extension_direct() {
+    local ext_id="$1"
+    local ext_dir="$2"
+    local publisher="${ext_id%%.*}"
+    local extension="${ext_id#*.}"
+    local target_path="$ext_dir/$ext_id"
+
+    # Skip if already installed (check for any version)
+    if ls -d "$ext_dir/${ext_id}"* &>/dev/null 2>&1; then
+        return 0
+    fi
+
+    # Download from VS Code Marketplace
+    local download_url="https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${publisher}/vsextensions/${extension}/latest/vspackage"
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+
+    if curl -fSL --retry 2 "$download_url" -o "$tmp_dir/extension.vsix" 2>/dev/null; then
+        # VSIX is just a zip file
+        mkdir -p "$target_path"
+        unzip -q "$tmp_dir/extension.vsix" -d "$tmp_dir/extracted" 2>/dev/null
+        if [ -d "$tmp_dir/extracted/extension" ]; then
+            cp -r "$tmp_dir/extracted/extension/"* "$target_path/"
+            echo "  Installed $ext_id"
+        else
+            print_warning "Failed to extract $ext_id"
+            rm -rf "$target_path"
+        fi
+    else
+        print_warning "Failed to download $ext_id"
+    fi
+
+    rm -rf "$tmp_dir"
+}
+
 # VS Code / Cursor extensions
 install_vscode_extensions() {
     local extensions_file="$DOTFILES_DIR/config/vscode/extensions.txt"
@@ -402,33 +439,32 @@ install_vscode_extensions() {
         return 1
     fi
 
-    print_header "Installing VS Code extensions..."
-
-    while IFS= read -r line || [ -n "$line" ]; do
-        # Skip comments and empty lines
-        [[ "$line" =~ ^#.*$ ]] && continue
-        [[ -z "${line// }" ]] && continue
-
-        local ext="$line"
-
-        # Install for VS Code if available
-        if command -v code &> /dev/null; then
-            if ! code --list-extensions | grep -qi "^${ext}$"; then
-                echo "Installing $ext for VS Code..."
-                code --install-extension "$ext" --force || print_warning "Failed to install $ext"
+    # Install for VS Code using CLI (works reliably)
+    if command -v code &> /dev/null; then
+        print_header "Installing VS Code extensions..."
+        while IFS= read -r line || [ -n "$line" ]; do
+            [[ "$line" =~ ^#.*$ ]] && continue
+            [[ -z "${line// }" ]] && continue
+            if ! code --list-extensions | grep -qi "^${line}$"; then
+                echo "Installing $line..."
+                code --install-extension "$line" --force || print_warning "Failed to install $line"
             fi
-        fi
+        done < "$extensions_file"
+        print_success "VS Code extensions installed"
+    fi
 
-        # Install for Cursor if available
-        if command -v cursor &> /dev/null; then
-            if ! cursor --list-extensions 2>/dev/null | grep -qi "^${ext}$"; then
-                echo "Installing $ext for Cursor..."
-                cursor --install-extension "$ext" --force 2>/dev/null || true
-            fi
-        fi
-    done < "$extensions_file"
-
-    print_success "VS Code extensions installed"
+    # Install for Cursor by downloading directly (CLI doesn't work well with AppImage)
+    local cursor_ext_dir="$HOME/.cursor/extensions"
+    if [ -d "$HOME/.cursor" ]; then
+        print_header "Installing Cursor extensions..."
+        mkdir -p "$cursor_ext_dir"
+        while IFS= read -r line || [ -n "$line" ]; do
+            [[ "$line" =~ ^#.*$ ]] && continue
+            [[ -z "${line// }" ]] && continue
+            install_extension_direct "$line" "$cursor_ext_dir"
+        done < "$extensions_file"
+        print_success "Cursor extensions installed"
+    fi
 }
 
 # Main
