@@ -455,7 +455,7 @@ install_vscode_extensions() {
 
     # Install for Cursor by downloading directly (CLI doesn't work well with AppImage)
     local cursor_ext_dir="$HOME/.cursor/extensions"
-    if [ -d "$HOME/.cursor" ]; then
+    if [ -f "$HOME/.local/bin/cursor.AppImage" ] || [ -d "$HOME/.cursor" ]; then
         print_header "Installing Cursor extensions..."
         mkdir -p "$cursor_ext_dir"
         while IFS= read -r line || [ -n "$line" ]; do
