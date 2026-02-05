@@ -31,7 +31,8 @@ OPTIONAL_SECRETS=(
     "$HOME/.env"
     "$HOME/.netrc"
     "$HOME/.npmrc"
-    "$HOME/.vercel"
+    "$HOME/.vercel"                       # macOS
+    "$HOME/.local/share/com.vercel.cli"   # Linux (XDG)
     "$HOME/.supabase"
     "$HOME/.aws"
     "$HOME/.config/gh"
@@ -64,9 +65,23 @@ encrypt_secrets() {
         exit 1
     fi
 
-    # Create archive
+    # Create archive (exclude sockets, runtime artifacts, and ephemeral data)
     echo "Creating archive..."
     tar -cvf "$TEMP_TAR" -C "$HOME" \
+        --ignore-failed-read \
+        --exclude='S.gpg-agent*' \
+        --exclude='*.lock' \
+        --exclude='*.sock' \
+        --exclude='.gnupg/crls.d' \
+        --exclude='.claude/debug' \
+        --exclude='.claude/statsig' \
+        --exclude='.claude/telemetry' \
+        --exclude='.claude/todos' \
+        --exclude='.claude/shell-snapshots' \
+        --exclude='.claude/session-env' \
+        --exclude='.claude/file-history' \
+        --exclude='.claude/ide' \
+        --exclude='.claude/cache' \
         $(for f in "${files_to_archive[@]}"; do echo "${f#$HOME/}"; done)
 
     # Encrypt with GPG (symmetric)

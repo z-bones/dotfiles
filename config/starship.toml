@@ -13,6 +13,10 @@ truncate_to_repo = false
 [git_status]
 style = "bold yellow"
 
+# Disable AWS region display
+[aws]
+disabled = true
+
 # Command duration - only show if command takes > 2 seconds
 [cmd_duration]
 min_time = 2000

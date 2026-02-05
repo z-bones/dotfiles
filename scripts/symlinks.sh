@@ -43,6 +43,13 @@ link_file "$DOTFILES_DIR/config/alacritty/alacritty.toml" "$HOME/.config/alacrit
 # Starship
 link_file "$DOTFILES_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 
+# Sway
+link_file "$DOTFILES_DIR/config/sway/config" "$HOME/.config/sway/config"
+
+# Waybar
+link_file "$DOTFILES_DIR/config/waybar/config.jsonc" "$HOME/.config/waybar/config.jsonc"
+link_file "$DOTFILES_DIR/config/waybar/style.css" "$HOME/.config/waybar/style.css"
+
 # Git
 link_file "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 

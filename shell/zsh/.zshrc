@@ -44,3 +44,4 @@ alias gc='git commit'
 alias gp='git push'
 alias gl='git log --oneline -10'
 alias gd='git diff'
+
