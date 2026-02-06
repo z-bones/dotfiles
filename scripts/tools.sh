@@ -34,7 +34,7 @@ install_nvm() {
     # Install global npm packages (always ensure they're present)
     if command -v npm &> /dev/null; then
         print_header "Installing global npm packages..."
-        npm install -g yarn @anthropic-ai/claude-code vercel 2>/dev/null || print_warning "Some npm packages failed to install"
+        npm install -g yarn @anthropic-ai/claude-code vercel aws-cdk 2>/dev/null || print_warning "Some npm packages failed to install"
     fi
 }
 

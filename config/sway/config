@@ -76,6 +76,14 @@ output * bg /usr/share/backgrounds/default-dark.jxl fill
 # You can get the names of your inputs by running: swaymsg -t get_inputs
 # Read `man 5 sway-input` for more information about this section.
 
+### Workspace assignments
+assign [app_id="foot"] workspace 1
+assign [app_id="cursor"] workspace 2
+assign [app_id="brave-browser"] workspace 3
+
+### Startup applications
+exec ~/.config/sway/startup.sh
+
 ### Key bindings
 #
 # Basics:

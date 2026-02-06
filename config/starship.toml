@@ -17,6 +17,13 @@ style = "bold yellow"
 [aws]
 disabled = true
 
+# Disable python version display
+[python]
+disabled = true
+
+[nodejs]
+disabled = true
+
 # Command duration - only show if command takes > 2 seconds
 [cmd_duration]
 min_time = 2000
