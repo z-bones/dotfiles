@@ -37,6 +37,7 @@ OPTIONAL_SECRETS=(
     "$HOME/.aws"
     "$HOME/.config/gh"
     "$HOME/.claude"
+    "$HOME/.password-store"
 )
 
 encrypt_secrets() {
