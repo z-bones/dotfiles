@@ -16,6 +16,7 @@ COMMON_PACKAGES=(
     htop
     tree
     tmux
+    pass
 )
 
 # Flatpak apps to install
