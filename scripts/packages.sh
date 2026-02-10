@@ -20,10 +20,11 @@ COMMON_PACKAGES=(
 
 # Flatpak apps to install
 FLATPAK_APPS=(
+    "app.zen_browser.zen"
     "com.brave.Browser"
     "md.obsidian.Obsidian"
-    "org.localsend.localsend_app"
     "org.audacityteam.Audacity"
+    "org.localsend.localsend_app"
 )
 
 install_debian() {

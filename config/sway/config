@@ -41,7 +41,9 @@ default_floating_border pixel 2
 #
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
 # Requires: desktop-backgrounds-compat, swaybg, jxl-pixbuf-loader
-output * bg /usr/share/backgrounds/default-dark.jxl fill
+# output * bg /usr/share/backgrounds/default-dark.jxl fill
+output * bg /home/zee/Pictures/moon.jpg fill
+
 #
 # Example configuration:
 #
@@ -79,7 +81,7 @@ output * bg /usr/share/backgrounds/default-dark.jxl fill
 ### Workspace assignments
 assign [app_id="foot"] workspace 1
 assign [app_id="cursor"] workspace 2
-assign [app_id="brave-browser"] workspace 3
+assign [app_id="app.zen_browser.zen"] workspace 3
 
 ### Startup applications
 exec ~/.config/sway/startup.sh

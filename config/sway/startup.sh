@@ -24,9 +24,9 @@ sleep 0.5
 swaymsg 'workspace 2'
 /home/zee/.local/bin/cursor &
 
-# Workspace 3: Brave
+# Workspace 3: Zen Browser
 swaymsg 'workspace 3'
-flatpak run com.brave.Browser &
+flatpak run app.zen_browser.zen &
 
 # Switch to workspace 1 on startup
 swaymsg 'workspace 1'
