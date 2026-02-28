@@ -26,6 +26,7 @@ FLATPAK_APPS=(
     "md.obsidian.Obsidian"
     "org.audacityteam.Audacity"
     "org.localsend.localsend_app"
+    "org.raspberrypi.rpi-imager"
 )
 
 install_debian() {
