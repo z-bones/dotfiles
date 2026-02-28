@@ -7,6 +7,9 @@ SAVEHIST=10000
 setopt SHARE_HISTORY
 setopt HIST_IGNORE_DUPS
 
+# GPG
+export GPG_TTY=$(tty)
+
 # Path additions
 export PATH="$HOME/.local/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
@@ -28,6 +31,9 @@ fi
 
 # Enable completion
 autoload -Uz compinit && compinit
+
+# Supabase CLI Docker host
+export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
 
 # Aliases
 alias ll='ls -alF'
