@@ -54,4 +54,28 @@ link_file "$DOTFILES_DIR/config/waybar/style.css" "$HOME/.config/waybar/style.cs
 # Git
 link_file "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 
+# SDDM custom theme (immutable Fedora compatible - uses /etc/ instead of /usr/share/)
+SDDM_THEME_SRC="/usr/share/sddm/themes/03-sway-fedora"
+SDDM_THEME_DST="/etc/sddm/themes/custom-sway"
+
+if [ -d "$SDDM_THEME_SRC" ] && [ -f "$DOTFILES_DIR/wallpapers/moon.jpg" ]; then
+    print_header "Installing custom SDDM theme..."
+    sudo mkdir -p "$SDDM_THEME_DST"
+
+    # Symlink original theme assets (QML, images, metadata)
+    for f in Main.qml metadata.desktop angle-down.png rectangle.png LICENSE README; do
+        [ -f "$SDDM_THEME_SRC/$f" ] && sudo ln -sf "$SDDM_THEME_SRC/$f" "$SDDM_THEME_DST/$f"
+    done
+
+    # Copy our wallpaper and theme.conf into the custom theme
+    sudo cp "$DOTFILES_DIR/wallpapers/moon.jpg" "$SDDM_THEME_DST/moon.jpg"
+    sudo cp "$DOTFILES_DIR/config/sddm/theme.conf" "$SDDM_THEME_DST/theme.conf"
+
+    # Tell SDDM to use our custom theme
+    sudo mkdir -p /etc/sddm.conf.d
+    sudo cp "$DOTFILES_DIR/config/sddm/sddm-theme.conf" /etc/sddm.conf.d/10-theme.conf
+
+    print_success "Installed custom SDDM theme to $SDDM_THEME_DST"
+fi
+
 print_success "Symlinks created"
