@@ -491,6 +491,113 @@ install_vscode_extensions() {
     fi
 }
 
+# AWS Toolbox (SSM plugin for ECS exec on immutable Fedora)
+setup_aws_toolbox() {
+    # Only relevant on immutable Fedora where SSM plugin RPM can't install to host
+    if [ "$(detect_fedora_pkg_mgr)" != "rpm-ostree" ]; then
+        # On mutable systems, install SSM plugin directly
+        if command -v session-manager-plugin &> /dev/null; then
+            print_success "SSM Session Manager plugin already installed"
+        else
+            print_header "Installing SSM Session Manager plugin..."
+            local tmp_dir
+            tmp_dir=$(mktemp -d)
+            curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/linux_64bit/session-manager-plugin.rpm" -o "$tmp_dir/ssm-plugin.rpm"
+            case "${DISTRO:-unknown}" in
+                debian)
+                    curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "$tmp_dir/ssm-plugin.deb"
+                    sudo dpkg -i "$tmp_dir/ssm-plugin.deb" || print_warning "Failed to install SSM plugin"
+                    ;;
+                fedora)
+                    sudo dnf install -y "$tmp_dir/ssm-plugin.rpm" 2>/dev/null || \
+                    sudo dnf5 install -y "$tmp_dir/ssm-plugin.rpm" 2>/dev/null || \
+                    print_warning "Failed to install SSM plugin"
+                    ;;
+                arch)
+                    print_warning "SSM plugin not available as pacman package — install from AUR: aws-session-manager-plugin"
+                    ;;
+            esac
+            rm -rf "$tmp_dir"
+        fi
+        return 0
+    fi
+
+    if ! command -v toolbox &> /dev/null; then
+        print_warning "toolbox not found, skipping AWS toolbox setup"
+        return 0
+    fi
+
+    # Check if toolbox already exists
+    if toolbox list 2>/dev/null | grep -q "dev-tools"; then
+        print_success "AWS toolbox already exists"
+    else
+        print_header "Creating AWS toolbox with SSM plugin..."
+        toolbox create dev-tools -y 2>/dev/null || true
+
+        # Install AWS CLI and SSM plugin inside the toolbox
+        toolbox run -c dev-tools bash -c '
+            cd /tmp
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+            unzip -q awscliv2.zip
+            sudo ./aws/install
+            rm -rf aws awscliv2.zip
+            curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/linux_64bit/session-manager-plugin.rpm" -o ssm-plugin.rpm
+            sudo dnf install -y ssm-plugin.rpm
+            rm ssm-plugin.rpm
+        '
+    fi
+
+    # Create a wrapper script so you can run `aws-ecs-exec` from the host
+    local wrapper="$HOME/.local/bin/aws-ecs-exec"
+    mkdir -p "$HOME/.local/bin"
+    cat > "$wrapper" << 'WRAPPER'
+#!/usr/bin/env bash
+# Wrapper to run `aws ecs execute-command` via the dev-tools toolbox
+# Usage: aws-ecs-exec --cluster <cluster> --task <task> --container <name> --command <cmd>
+exec toolbox run -c dev-tools aws ecs execute-command --interactive "$@"
+WRAPPER
+    chmod +x "$wrapper"
+    print_success "AWS toolbox ready — use 'aws-ecs-exec' or 'toolbox enter dev-tools' then run aws commands"
+}
+
+# Proton Authenticator (2FA)
+install_proton_authenticator() {
+    if rpm -q proton-authenticator &>/dev/null; then
+        print_success "Proton Authenticator already installed"
+    else
+        print_header "Installing Proton Authenticator..."
+        local tmp_dir
+        tmp_dir=$(mktemp -d)
+        cd "$tmp_dir"
+
+        if curl -fsSL "https://proton.me/download/authenticator/linux/ProtonAuthenticator.rpm" -o ProtonAuthenticator.rpm; then
+            case "${DISTRO:-unknown}" in
+                fedora)
+                    case "$(detect_fedora_pkg_mgr)" in
+                        rpm-ostree)
+                            sudo rpm-ostree install -y --allow-inactive "$(pwd)/ProtonAuthenticator.rpm" || print_warning "Failed to install Proton Authenticator"
+                            ;;
+                        dnf5)
+                            sudo dnf5 install -y ProtonAuthenticator.rpm || print_warning "Failed to install Proton Authenticator"
+                            ;;
+                        dnf)
+                            sudo dnf install -y ProtonAuthenticator.rpm || print_warning "Failed to install Proton Authenticator"
+                            ;;
+                    esac
+                    ;;
+                *)
+                    print_warning "Proton Authenticator RPM only supported on Fedora/RHEL"
+                    ;;
+            esac
+        else
+            print_warning "Failed to download Proton Authenticator"
+        fi
+
+        cd - > /dev/null
+        rm -rf "$tmp_dir"
+    fi
+}
+
 # Main
 install_nvm
 install_rust
@@ -501,6 +608,8 @@ install_gh
 install_docker
 install_supabase
 install_aws
+setup_aws_toolbox
+install_proton_authenticator
 install_cursor
 install_synthwave_theme
 install_vscode_extensions
