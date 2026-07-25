@@ -46,6 +46,8 @@ link_file "$DOTFILES_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 # Sway
 link_file "$DOTFILES_DIR/config/sway/config" "$HOME/.config/sway/config"
 link_file "$DOTFILES_DIR/config/sway/startup.sh" "$HOME/.config/sway/startup.sh"
+# Drop-ins, picked up by the config.d include at the bottom of config
+link_file "$DOTFILES_DIR/config/sway/config.d/android-emulator.conf" "$HOME/.config/sway/config.d/android-emulator.conf"
 
 # Waybar
 link_file "$DOTFILES_DIR/config/waybar/config.jsonc" "$HOME/.config/waybar/config.jsonc"

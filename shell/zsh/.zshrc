@@ -51,3 +51,11 @@ alias gp='git push'
 alias gl='git log --oneline -10'
 alias gd='git diff'
 
+
+# Android SDK — only inside a toolbox container. $HOME is shared with the host,
+# so /run/.toolboxenv (container-only) keeps these off the host shell, which has
+# no JDK and can't run the toolchain anyway.
+if [ -f /run/.toolboxenv ]; then
+  export JAVA_HOME="$HOME/.jdks/jdk-17.0.20+8"
+  export ANDROID_HOME="$HOME/Android/Sdk"
+  export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"

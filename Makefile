@@ -1,4 +1,4 @@
-.PHONY: install packages tools symlinks encrypt decrypt update help
+.PHONY: install packages tools symlinks android encrypt decrypt update help
 
 DOTFILES_DIR := $(HOME)/.dotfiles
 
@@ -12,6 +12,7 @@ help:
 	@echo "  packages  - Install system packages only"
 	@echo "  tools     - Install development tools only"
 	@echo "  symlinks  - Create config symlinks only"
+	@echo "  android   - Set up the Android dev toolbox (JDK, SDK, emulator)"
 	@echo "  encrypt   - Encrypt secrets (SSH keys, GPG, etc.)"
 	@echo "  decrypt   - Decrypt and install secrets"
 	@echo "  update    - Pull latest changes and re-symlink"
@@ -27,6 +28,9 @@ tools:
 
 symlinks:
 	@source ./scripts/symlinks.sh
+
+android:
+	@./scripts/android.sh setup
 
 encrypt:
 	@./scripts/secrets.sh encrypt
