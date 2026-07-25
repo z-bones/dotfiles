@@ -29,11 +29,43 @@ BUILD_TOOLS="36.0.0"
 NDK_VERSION="27.1.12297006"
 SYSTEM_IMAGE="system-images;android-${ANDROID_API};google_apis;x86_64"
 
-# Fall back to plain echo when sourced outside install.sh, which defines these.
+# install.sh defines these and sources its scripts; `make android` runs this one
+# standalone, so fall back to equivalents when they aren't already in scope.
 command -v print_header  >/dev/null 2>&1 || print_header()  { echo -e "\n==> $*"; }
-command -v print_success >/dev/null 2>&1 || print_success() { echo "  ok: $*"; }
+command -v print_success >/dev/null 2>&1 || print_success() { echo "  ✓ $*"; }
+command -v print_warning >/dev/null 2>&1 || print_warning() { echo "  ! $*"; }
+command -v detect_fedora_pkg_mgr >/dev/null 2>&1 || detect_fedora_pkg_mgr() {
+    if command -v rpm-ostree &> /dev/null && rpm-ostree status &> /dev/null; then
+        echo "rpm-ostree"
+    elif command -v dnf5 &> /dev/null; then
+        echo "dnf5"
+    elif command -v dnf &> /dev/null; then
+        echo "dnf"
+    else
+        echo "none"
+    fi
+}
 
 tb() { toolbox run --container "$CONTAINER" "$@"; }
+
+# Same shape as setup_aws_toolbox() in tools.sh: warn and skip rather than abort,
+# so an unsupported host never breaks a full `make install`.
+#
+# Gated on toolbox rather than on rpm-ostree specifically — toolbox works on
+# mutable Fedora too, and the container is worth having either way for the ~8 GB
+# of SDK and the emulator's Qt/WebEngine dependencies.
+check_host() {
+    if ! command -v toolbox &> /dev/null; then
+        print_warning "toolbox not found, skipping Android toolbox setup"
+        if [ "$(detect_fedora_pkg_mgr)" = "none" ]; then
+            print_warning "Not a Fedora host. On macOS install Android Studio directly — it bundles a JDK and SDK, and macOS builds iOS too."
+        else
+            print_warning "Install it with: sudo $(detect_fedora_pkg_mgr) install toolbox"
+        fi
+        return 1
+    fi
+    return 0
+}
 
 create_container() {
     if toolbox list --containers 2>/dev/null | grep -q "\b${CONTAINER}\b"; then
@@ -146,6 +178,7 @@ launch_emulator() {
 }
 
 main() {
+    check_host || return 0
     case "${1:-setup}" in
         emulator) launch_emulator ;;
         setup)
