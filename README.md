@@ -116,6 +116,7 @@ make install    # Full installation
 make packages   # Install packages only
 make tools      # Install dev tools only
 make symlinks   # Create symlinks only
+make android    # Set up the Android dev toolbox
 make encrypt    # Encrypt secrets
 make decrypt    # Decrypt secrets
 make update     # Pull latest and re-symlink
@@ -130,3 +131,33 @@ Edit `config/vscode/extensions.txt` and add extension IDs (one per line).
 ### Modifying Flatpak Apps
 
 Edit the `FLATPAK_APPS` array in `scripts/packages.sh`.
+
+### Android Development
+
+`make android` builds a Fedora toolbox container with the full Android toolchain —
+Temurin JDK 17, the SDK command-line tools, an API 36 x86_64 system image, and a
+Pixel 8 AVD. It is idempotent, so re-running it only fills in what's missing.
+
+The host stays clean: it's an rpm-ostree system, so layering a JDK and the
+emulator's Qt/WebEngine dependencies would mean a reboot per change. The container
+shares `$HOME`, `/dev` (including `/dev/kvm`), the Wayland sockets, and the host
+network namespace, so a Metro bundler on `:8081` is reachable from either side.
+Anything under `$HOME` — JDK, SDK, AVDs — survives `toolbox rm`.
+
+Two things that are easy to get wrong:
+
+- **JDK 17 is not optional and not in the Fedora repos.** Fedora 43 ships 21/25/26,
+  but React Native's Gradle plugin requests a 17 toolchain and there's no Foojay
+  resolver to auto-provision one, so Gradle fails outright. The script installs
+  Temurin 17, matching CI.
+- **Never validate the emulator headlessly.** `-no-window` boots fine without the
+  X libraries the windowed UI needs, so a `-no-window` smoke test will pass while
+  the real emulator is still broken.
+
+Sway tiles the emulator's windows by default, which lays its toolbars out on top of
+the device screen — a 644x50 strip lands mid-viewport and reads as a black bar.
+`config/sway/config.d/android-emulator.conf` handles that: device window tiled,
+toolbars hidden in the scratchpad. Do not change that rule to `kill` — the side
+toolbar is load-bearing and killing it shuts the emulator down.
+
+iOS cannot be built on Linux at all; Xcode is macOS-only.

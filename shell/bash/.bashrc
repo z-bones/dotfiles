@@ -64,6 +64,9 @@ if ! shopt -oq posix; then
     fi
 fi
 
+# GPG
+export GPG_TTY=$(tty)
+
 # NVM
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
