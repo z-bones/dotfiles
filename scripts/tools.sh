@@ -91,7 +91,13 @@ install_fonts() {
     fi
 }
 
-# Alacritty terminal (via cargo)
+# Alacritty terminal.
+#
+# Prefer the distro package: Fedora, Debian and Arch all ship alacritty, and a
+# source build costs several minutes and a full C toolchain for no benefit.
+# Only fall back to cargo when no package is available, and only when a linker
+# is actually present — `cargo install` fails with "linker `cc` not found"
+# otherwise, which on rpm-ostree is guaranteed until the host reboots.
 install_alacritty() {
     # Skip in containers (GUI app, requires OpenGL)
     if [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then
@@ -101,42 +107,80 @@ install_alacritty() {
 
     if command -v alacritty &> /dev/null; then
         print_success "Alacritty already installed"
-    else
-        print_header "Installing Alacritty via cargo..."
+        return 0
+    fi
 
-        # Install dependencies based on distro
-        local alacritty_deps=(cmake freetype-devel fontconfig-devel libxcb-devel libxkbcommon-devel scdoc)
-        case "${DISTRO:-unknown}" in
-            debian)
-                sudo apt install -y cmake pkg-config libfreetype6-dev libfontconfig1-dev \
-                    libxcb-xfixes0-dev libxkbcommon-dev python3 scdoc
-                ;;
-            fedora)
-                case "$(detect_fedora_pkg_mgr)" in
-                    rpm-ostree)
-                        sudo rpm-ostree install -y --allow-inactive --idempotent "${alacritty_deps[@]}"
-                        print_warning "Alacritty deps require reboot before cargo install will work"
-                        ;;
-                    dnf5)
-                        sudo dnf5 install -y "${alacritty_deps[@]}"
-                        ;;
-                    dnf)
-                        sudo dnf install -y "${alacritty_deps[@]}"
-                        ;;
-                esac
-                ;;
-            arch)
-                sudo pacman -S --noconfirm cmake freetype2 fontconfig pkg-config make \
-                    libxcb libxkbcommon python scdoc
-                ;;
-        esac
+    print_header "Installing Alacritty..."
 
-        cargo install alacritty
+    # 1. Distro package
+    case "${DISTRO:-unknown}" in
+        debian) sudo apt install -y alacritty && return 0 ;;
+        arch)   sudo pacman -S --noconfirm alacritty && return 0 ;;
+        fedora)
+            case "$(detect_fedora_pkg_mgr)" in
+                rpm-ostree)
+                    if sudo rpm-ostree install -y --allow-inactive --idempotent alacritty; then
+                        print_warning "Alacritty available after reboot"
+                        return 0
+                    fi
+                    ;;
+                dnf5) sudo dnf5 install -y alacritty && return 0 ;;
+                dnf)  sudo dnf install -y alacritty && return 0 ;;
+            esac
+            ;;
+    esac
 
-        # Add desktop entry
-        if [ -f "$HOME/.cargo/bin/alacritty" ]; then
-            mkdir -p ~/.local/share/applications
-            cat > ~/.local/share/applications/alacritty.desktop << EOF
+    print_warning "No Alacritty package available, falling back to a source build"
+
+    # 2. Source build — needs a working C toolchain
+    if ! command -v cc &> /dev/null; then
+        print_warning "No C linker (cc) found — skipping Alacritty source build."
+        print_warning "Install gcc first (and reboot if this is an rpm-ostree host), then: make tools"
+        return 0
+    fi
+    if ! command -v cargo &> /dev/null; then
+        print_warning "cargo not found, skipping Alacritty"
+        return 0
+    fi
+
+    # Build dependencies. gcc/pkg-config included: the cargo path needs a
+    # linker and pkg-config to locate the system libraries.
+    local alacritty_deps=(gcc pkgconf-pkg-config cmake freetype-devel fontconfig-devel
+                          libxcb-devel libxkbcommon-devel scdoc)
+    case "${DISTRO:-unknown}" in
+        debian)
+            sudo apt install -y build-essential cmake pkg-config libfreetype6-dev \
+                libfontconfig1-dev libxcb-xfixes0-dev libxkbcommon-dev python3 scdoc \
+                || print_warning "Some Alacritty deps failed to install"
+            ;;
+        fedora)
+            case "$(detect_fedora_pkg_mgr)" in
+                rpm-ostree)
+                    sudo rpm-ostree install -y --allow-inactive --idempotent "${alacritty_deps[@]}" \
+                        || print_warning "Some Alacritty deps failed to install"
+                    print_warning "Deps require a reboot before the build will work"
+                    return 0
+                    ;;
+                dnf5) sudo dnf5 install -y "${alacritty_deps[@]}" || print_warning "Some Alacritty deps failed" ;;
+                dnf)  sudo dnf install -y "${alacritty_deps[@]}"  || print_warning "Some Alacritty deps failed" ;;
+            esac
+            ;;
+        arch)
+            sudo pacman -S --noconfirm base-devel cmake freetype2 fontconfig pkg-config make \
+                libxcb libxkbcommon python scdoc || print_warning "Some Alacritty deps failed"
+            ;;
+    esac
+
+    if ! cargo install alacritty; then
+        print_warning "Alacritty build failed, continuing"
+        return 0
+    fi
+
+    # Desktop entry for the cargo-installed binary (the distro package ships
+    # its own, so this only applies to the source-build path).
+    if [ -f "$HOME/.cargo/bin/alacritty" ]; then
+        mkdir -p ~/.local/share/applications
+        cat > ~/.local/share/applications/alacritty.desktop << EOF
 [Desktop Entry]
 Type=Application
 Name=Alacritty
@@ -147,7 +191,6 @@ Icon=alacritty
 Terminal=false
 Categories=System;TerminalEmulator;
 EOF
-        fi
     fi
 }
 
@@ -636,20 +679,40 @@ install_lmstudio() {
 }
 
 # Main
-install_nvm
-install_rust
-install_starship
-install_fonts
-install_alacritty
-install_gh
-install_docker
-install_supabase
-install_aws
-setup_aws_toolbox
-install_proton_authenticator
-install_cursor
-install_lmstudio
-install_synthwave_theme
-install_vscode_extensions
+#
+# Each installer runs independently. This script is sourced under `set -e`, so
+# without the guard a single failure aborts every step after it — a failed
+# Alacritty build used to take gh, docker, supabase, aws, Cursor and the VS
+# Code extensions down with it. Failures are collected and reported instead.
+INSTALLERS=(
+    install_nvm
+    install_rust
+    install_starship
+    install_fonts
+    install_alacritty
+    install_gh
+    install_docker
+    install_supabase
+    install_aws
+    setup_aws_toolbox
+    install_proton_authenticator
+    install_cursor
+    install_lmstudio
+    install_synthwave_theme
+    install_vscode_extensions
+)
 
-print_success "Development tools installation complete"
+FAILED=()
+for step in "${INSTALLERS[@]}"; do
+    if ! "$step"; then
+        print_error "$step failed"
+        FAILED+=("$step")
+    fi
+done
+
+if [ ${#FAILED[@]} -eq 0 ]; then
+    print_success "Development tools installation complete"
+else
+    print_warning "Completed with ${#FAILED[@]} failed step(s): ${FAILED[*]}"
+    print_warning "Re-run just this stage with: make tools"
+fi
