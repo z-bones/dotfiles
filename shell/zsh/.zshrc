@@ -32,8 +32,8 @@ fi
 # Enable completion
 autoload -Uz compinit && compinit
 
-# Supabase CLI Docker host
-export DOCKER_HOST=unix:///run/user/1000/podman/podman.sock
+# Supabase CLI Docker host (podman's user socket — UID varies by machine)
+export DOCKER_HOST="unix:///run/user/$(id -u)/podman/podman.sock"
 
 # Aliases
 alias ll='ls -alF'
@@ -52,6 +52,9 @@ alias gl='git log --oneline -10'
 alias gd='git diff'
 
 
+# LM Studio CLI (lms) — only present on x86_64 hosts
+[ -d "$HOME/.lmstudio/bin" ] && export PATH="$PATH:$HOME/.lmstudio/bin"
+
 # Android SDK — only inside a toolbox container. $HOME is shared with the host,
 # so /run/.toolboxenv (container-only) keeps these off the host shell, which has
 # no JDK and can't run the toolchain anyway.
@@ -59,3 +62,4 @@ if [ -f /run/.toolboxenv ]; then
   export JAVA_HOME="$HOME/.jdks/jdk-17.0.20+8"
   export ANDROID_HOME="$HOME/Android/Sdk"
   export PATH="$JAVA_HOME/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+fi

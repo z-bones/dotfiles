@@ -62,15 +62,22 @@ cd ~/.dotfiles
 dotfiles/
 ├── install.sh              # Main bootstrap script
 ├── scripts/
+│   ├── lib.sh              # Shared helpers + distro/arch detection
 │   ├── packages.sh         # System packages + Flatpaks
 │   ├── tools.sh            # Dev tools (nvm, rust, docker, etc.)
 │   ├── symlinks.sh         # Config symlinks
+│   ├── android.sh          # Android toolbox (JDK, SDK, emulator)
 │   └── secrets.sh          # GPG encrypt/decrypt
 ├── shell/
-│   ├── fish/               # Fish config
+│   ├── zsh/                # Zsh config (default shell)
 │   └── bash/               # Bash config
 ├── config/
 │   ├── alacritty/          # Terminal config
+│   ├── sway/
+│   │   ├── config          # Sway WM config
+│   │   ├── startup.sh      # Session startup layout
+│   │   └── config.d/       # Drop-ins (laptop, android-emulator)
+│   ├── waybar/             # Status bar config + styles
 │   ├── vscode/
 │   │   └── extensions.txt  # VS Code/Cursor extensions list
 │   └── starship.toml       # Prompt config
@@ -106,8 +113,31 @@ make decrypt
 ## Supported Distros
 
 - Ubuntu / Debian / Pop!_OS / Linux Mint
-- Fedora / RHEL / Rocky / Alma
+- Fedora / RHEL / Rocky / Alma — both traditional (`dnf`/`dnf5`) and atomic (`rpm-ostree`)
 - Arch / Manjaro / EndeavourOS
+
+## Supported Architectures
+
+`x86_64` and `aarch64` (e.g. Fedora Asahi Remix on Apple Silicon). `scripts/lib.sh`
+detects the arch and picks the right download for each vendor's naming scheme.
+
+Tools with no upstream Linux `aarch64` build are skipped with a warning rather
+than failing the run:
+
+| Tool | aarch64 |
+|---|---|
+| AWS CLI, Cursor, Supabase, Temurin JDK, SSM plugin | native build used |
+| Android emulator image | `arm64-v8a` instead of `x86_64` |
+| LM Studio | skipped — no Linux ARM build |
+| Brave (Flatpak) | skipped — x86_64-only on Flathub |
+
+## Laptop vs Desktop
+
+`config/sway/config.d/laptop.conf` holds touchpad, lid-switch, idle-lock and
+brightness-key settings. `symlinks.sh` links it only when the host has a battery
+(`/sys/class/power_supply/BAT*`), so one branch serves both machines. Waybar's
+`backlight` and `battery` modules are always declared — Waybar disables a module
+whose hardware is absent.
 
 ## Make Commands
 

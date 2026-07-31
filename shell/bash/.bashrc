@@ -82,3 +82,6 @@ export PATH="$PATH:$HOME/.local/bin"
 if command -v starship &> /dev/null; then
     eval "$(starship init bash)"
 fi
+
+# LM Studio CLI (lms) — only present on x86_64 hosts
+[ -d "$HOME/.lmstudio/bin" ] && export PATH="$PATH:$HOME/.lmstudio/bin"
