@@ -50,6 +50,7 @@ link_file "$DOTFILES_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 # Sway
 link_file "$DOTFILES_DIR/config/sway/config" "$HOME/.config/sway/config"
 link_file "$DOTFILES_DIR/config/sway/startup.sh" "$HOME/.config/sway/startup.sh"
+link_file "$DOTFILES_DIR/config/sway/wallpaper.sh" "$HOME/.config/sway/wallpaper.sh"
 # Drop-ins, picked up by the config.d include at the bottom of config
 if command -v sway &> /dev/null; then
     link_file "$DOTFILES_DIR/config/sway/config.d/android-emulator.conf" "$HOME/.config/sway/config.d/android-emulator.conf"

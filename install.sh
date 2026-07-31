@@ -97,14 +97,19 @@ find_usb_secrets() {
         "/mnt"
     )
     for base in "${usb_paths[@]}"; do
-        if [ -d "$base" ]; then
-            for drive in "$base"/*; do
-                if [ -f "$drive/secrets.tar.gpg" ]; then
-                    echo "$drive/secrets.tar.gpg"
-                    return 0
-                fi
-            done
+        [ -d "$base" ] || continue
+        # The archive at the mount root itself (e.g. /mnt/secrets.tar.gpg)...
+        if [ -f "$base/secrets.tar.gpg" ]; then
+            echo "$base/secrets.tar.gpg"
+            return 0
         fi
+        # ...or at the root of a drive mounted under it.
+        for drive in "$base"/*; do
+            if [ -f "$drive/secrets.tar.gpg" ]; then
+                echo "$drive/secrets.tar.gpg"
+                return 0
+            fi
+        done
     done
     return 1
 }
@@ -124,6 +129,19 @@ if [ -f "$DOTFILES_DIR/secrets/secrets.tar.gpg" ]; then
         print_header "Decrypting secrets..."
         source "$DOTFILES_DIR/scripts/secrets.sh" decrypt
     fi
+else
+    # Previously silent, which looked like the step had run and found nothing
+    # to do. Say so explicitly and give the manual path.
+    print_header "Secrets"
+    print_warning "No secrets.tar.gpg found — SSH keys, GPG keys and tokens were NOT installed"
+    echo "  Searched: /media/$USER/*, /run/media/$USER/*, /mnt/* (and those dirs themselves)"
+    echo "  The archive must sit at the ROOT of the drive, and the drive must be"
+    echo "  mounted before you run this. Sway has no automounter by default:"
+    echo ""
+    echo "    lsblk -o NAME,SIZE,RM,LABEL          # find the stick (RM=1)"
+    echo "    udisksctl mount -b /dev/sdXN         # mount it"
+    echo "    cp /run/media/$USER/<label>/secrets.tar.gpg $DOTFILES_DIR/secrets/"
+    echo "    make decrypt"
 fi
 
 # Set zsh as default shell
