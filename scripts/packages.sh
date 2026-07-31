@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+# Shared helpers + detection. Sourced from install.sh (already loaded, no-op) or
+# run standalone via `make`.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
 # Base packages needed on all distros
 COMMON_PACKAGES=(
     zsh
@@ -19,6 +23,15 @@ COMMON_PACKAGES=(
     pass
 )
 
+# Sway session extras. Referenced by config.d/laptop.conf (brightness keys,
+# idle-lock) and by the volume bindings, so install them wherever sway runs.
+SWAY_PACKAGES=(
+    brightnessctl
+    swayidle
+    swaylock
+    wireplumber
+)
+
 # Flatpak apps to install
 FLATPAK_APPS=(
     "app.zen_browser.zen"
@@ -27,12 +40,19 @@ FLATPAK_APPS=(
     "org.audacityteam.Audacity"
     "org.localsend.localsend_app"
     "org.raspberrypi.rpi-imager"
+    "com.obsproject.Studio"
 )
+
+# Final install list: base packages, plus the sway extras when sway is present.
+INSTALL_PACKAGES=("${COMMON_PACKAGES[@]}")
+if command -v sway &> /dev/null; then
+    INSTALL_PACKAGES+=("${SWAY_PACKAGES[@]}")
+fi
 
 install_debian() {
     print_header "Installing packages via apt..."
     sudo apt update
-    sudo apt install -y "${COMMON_PACKAGES[@]}" build-essential flatpak
+    sudo apt install -y "${INSTALL_PACKAGES[@]}" build-essential flatpak
 
     # Add Flathub if not present
     if ! flatpak remotes | grep -q flathub; then
@@ -50,14 +70,14 @@ install_fedora() {
         rpm-ostree)
             # rpm-ostree doesn't support groups like @development-tools
             # flatpak is pre-installed on immutable Fedora
-            sudo rpm-ostree install -y --allow-inactive --idempotent "${COMMON_PACKAGES[@]}"
+            sudo rpm-ostree install -y --allow-inactive --idempotent "${INSTALL_PACKAGES[@]}"
             print_warning "System packages will be available after reboot"
             ;;
         dnf5)
-            sudo dnf5 install -y "${COMMON_PACKAGES[@]}" @development-tools flatpak
+            sudo dnf5 install -y "${INSTALL_PACKAGES[@]}" @development-tools flatpak
             ;;
         dnf)
-            sudo dnf install -y "${COMMON_PACKAGES[@]}" @development-tools flatpak
+            sudo dnf install -y "${INSTALL_PACKAGES[@]}" @development-tools flatpak
             ;;
         *)
             print_error "No supported package manager found"
@@ -74,7 +94,7 @@ install_fedora() {
 
 install_arch() {
     print_header "Installing packages via pacman..."
-    sudo pacman -Syu --noconfirm "${COMMON_PACKAGES[@]}" base-devel flatpak
+    sudo pacman -Syu --noconfirm "${INSTALL_PACKAGES[@]}" base-devel flatpak
 
     if ! flatpak remotes | grep -q flathub; then
         print_header "Adding Flathub repository..."

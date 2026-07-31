@@ -20,9 +20,11 @@ swaymsg 'focus right; splitv'
 foot &
 sleep 0.5
 
-# Workspace 2: Cursor
-swaymsg 'workspace 2'
-/home/zee/.local/bin/cursor &
+# Workspace 2: Cursor (skip if the install was arch-skipped)
+if [ -x "$HOME/.local/bin/cursor" ]; then
+    swaymsg 'workspace 2'
+    "$HOME/.local/bin/cursor" &
+fi
 
 # Workspace 3: Zen Browser
 swaymsg 'workspace 3'

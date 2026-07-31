@@ -14,17 +14,20 @@
     "modules-center": [
         "sway/window"
     ],
+    // backlight and battery are laptop-only. Waybar disables a module whose
+    // hardware is absent (logs a warning and carries on), so leaving them in
+    // is safe on the desktop and saves maintaining two configs.
     "modules-right": [
         "idle_inhibitor",
         "pulseaudio",
         "network",
         "power-profiles-daemon",
+        "backlight",
+        "battery",
         // "cpu",
         // "memory",
         // "temperature",
-        // "backlight",
         // "sway/language",
-        // "battery",
         "clock",
         "tray"
     ],
@@ -128,7 +131,7 @@
     "backlight": {
         // "device": "acpi_video1",
         "format": "{percent}% {icon}",
-        "format-icons": ["🌑", "🌘", "🌗", "🌖", "🌕"]
+        "format-icons": ["󰃞", "󰃟", "󰃠"]
     },
     "battery": {
         "states": {

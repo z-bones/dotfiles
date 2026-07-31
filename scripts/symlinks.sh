@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+# Shared helpers + detection. Sourced from install.sh (already loaded, no-op) or
+# run standalone via `make`.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
 DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
 
 # Create a symlink, backing up existing files
@@ -49,6 +53,16 @@ link_file "$DOTFILES_DIR/config/sway/startup.sh" "$HOME/.config/sway/startup.sh"
 # Drop-ins, picked up by the config.d include at the bottom of config
 if command -v sway &> /dev/null; then
     link_file "$DOTFILES_DIR/config/sway/config.d/android-emulator.conf" "$HOME/.config/sway/config.d/android-emulator.conf"
+
+    # Touchpad, lid switch, idle-lock and brightness keys only make sense on a
+    # laptop. A battery under /sys/class/power_supply is the portable tell.
+    if compgen -G "/sys/class/power_supply/BAT*" > /dev/null; then
+        link_file "$DOTFILES_DIR/config/sway/config.d/laptop.conf" "$HOME/.config/sway/config.d/laptop.conf"
+        print_success "Laptop detected — linked laptop.conf"
+    else
+        rm -f "$HOME/.config/sway/config.d/laptop.conf"
+        print_success "No battery found — skipping laptop.conf"
+    fi
 fi
 
 # Waybar
