@@ -1,72 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
 DOTFILES_DIR="$HOME/.dotfiles"
 REPO_URL="https://github.com/z-bones/dotfiles.git"
 
-print_header() {
-    echo -e "\n${BLUE}==>${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}✓${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}!${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}✗${NC} $1"
-}
-
-# Detect distro
-detect_distro() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        case "$ID" in
-            ubuntu|debian|pop|linuxmint)
-                echo "debian"
-                ;;
-            fedora|rhel|centos|rocky|alma)
-                echo "fedora"
-                ;;
-            arch|manjaro|endeavouros)
-                echo "arch"
-                ;;
-            *)
-                echo "unknown"
-                ;;
-        esac
-    else
-        echo "unknown"
-    fi
-}
-
-# Detect Fedora package manager (rpm-ostree for immutable, dnf5/dnf for traditional)
-detect_fedora_pkg_mgr() {
-    if command -v rpm-ostree &> /dev/null && rpm-ostree status &> /dev/null; then
-        echo "rpm-ostree"
-    elif command -v dnf5 &> /dev/null; then
-        echo "dnf5"
-    elif command -v dnf &> /dev/null; then
-        echo "dnf"
-    else
-        echo "unknown"
-    fi
-}
-
-DISTRO=$(detect_distro)
+# Shared helpers + DISTRO/ARCH/ARCH_ALT/ARCH_DEB detection.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/scripts/lib.sh"
 
 print_header "Dotfiles Bootstrap"
 echo "Detected distro family: $DISTRO"
+echo "Detected architecture:  $ARCH"
+
+if [ "$ARCH" = "unknown" ]; then
+    print_warning "Unrecognised architecture $(uname -m) — arch-specific installs will be skipped"
+fi
 
 # Bootstrap: install git and curl if missing
 bootstrap_deps() {
@@ -115,9 +63,7 @@ bootstrap_deps() {
 
 bootstrap_deps
 
-# Determine dotfiles location
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
+# Determine dotfiles location (SCRIPT_DIR was set above, next to lib.sh)
 # If running from the dotfiles repo itself, use that location
 if [ -f "$SCRIPT_DIR/Makefile" ] && [ -d "$SCRIPT_DIR/scripts" ]; then
     DOTFILES_DIR="$SCRIPT_DIR"

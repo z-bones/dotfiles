@@ -20,14 +20,16 @@ help:
 install:
 	@./install.sh
 
+# `source` is a bash builtin and make uses /bin/sh, so invoke bash explicitly.
+# Each script sources scripts/lib.sh itself, so these work standalone.
 packages:
-	@source ./scripts/packages.sh
+	@bash ./scripts/packages.sh
 
 tools:
-	@source ./scripts/tools.sh
+	@bash ./scripts/tools.sh
 
 symlinks:
-	@source ./scripts/symlinks.sh
+	@bash ./scripts/symlinks.sh
 
 android:
 	@./scripts/android.sh setup
@@ -40,5 +42,5 @@ decrypt:
 
 update:
 	@git pull --ff-only
-	@source ./scripts/symlinks.sh
+	@bash ./scripts/symlinks.sh
 	@echo "Updated and re-linked!"
