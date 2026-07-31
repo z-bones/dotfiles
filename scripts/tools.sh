@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+# Shared helpers + detection. Sourced from install.sh (already loaded, no-op) or
+# run standalone via `make`.
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
 # NVM - Node Version Manager
 install_nvm() {
     if [ -d "$HOME/.nvm" ]; then
@@ -256,14 +260,14 @@ install_supabase() {
 
         case "${DISTRO:-unknown}" in
             debian)
-                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_amd64.deb" -o supabase.deb; then
+                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_${ARCH_DEB}.deb" -o supabase.deb; then
                     sudo dpkg -i supabase.deb || print_warning "Failed to install Supabase"
                 else
                     print_warning "Failed to download Supabase CLI"
                 fi
                 ;;
             fedora)
-                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_amd64.rpm" -o supabase.rpm; then
+                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_${ARCH_DEB}.rpm" -o supabase.rpm; then
                     case "$(detect_fedora_pkg_mgr)" in
                         rpm-ostree)
                             sudo rpm-ostree install -y --allow-inactive "$(pwd)/supabase.rpm" || print_warning "Failed to install Supabase"
@@ -277,7 +281,7 @@ install_supabase() {
                 fi
                 ;;
             arch)
-                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_amd64.pkg.tar.zst" -o supabase.pkg.tar.zst; then
+                if curl -fsSL "https://github.com/supabase/cli/releases/download/v${version}/supabase_${version}_linux_${ARCH_DEB}.pkg.tar.zst" -o supabase.pkg.tar.zst; then
                     sudo pacman -U --noconfirm supabase.pkg.tar.zst || print_warning "Failed to install Supabase"
                 else
                     print_warning "Failed to download Supabase CLI"
@@ -299,12 +303,21 @@ install_aws() {
         print_success "AWS CLI already installed"
     else
         print_header "Installing AWS CLI v2..."
+        if [ "${ARCH:-unknown}" = "unknown" ]; then
+            print_warning "Unknown architecture, skipping AWS CLI"
+            return 0
+        fi
         local tmp_dir
         tmp_dir=$(mktemp -d)
         cd "$tmp_dir"
-        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-        unzip -q awscliv2.zip
-        sudo ./aws/install
+        # Guarded: a failed download or install must not abort the whole run
+        # (this script is sourced under `set -e`).
+        if curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip" \
+            && unzip -q awscliv2.zip; then
+            sudo ./aws/install || print_warning "Failed to install AWS CLI"
+        else
+            print_warning "Failed to download AWS CLI for $ARCH"
+        fi
         cd - > /dev/null
         rm -rf "$tmp_dir"
     fi
@@ -333,15 +346,19 @@ install_cursor() {
 
         # Get latest AppImage URL from Cursor's download API
         local download_url
-        download_url=$(curl -fsSL "https://www.cursor.com/api/download?platform=linux-x64&releaseTrack=stable" | grep -o '"downloadUrl":"[^"]*"' | cut -d'"' -f4)
+        download_url=$(curl -fsSL "https://www.cursor.com/api/download?platform=linux-${ARCH_ALT}&releaseTrack=stable" | grep -o '"downloadUrl":"[^"]*"' | cut -d'"' -f4)
 
         if [ -z "$download_url" ]; then
-            print_error "Failed to fetch Cursor download URL"
-            return 1
+            print_warning "Failed to fetch Cursor download URL for linux-${ARCH_ALT}, skipping"
+            return 0
         fi
 
         # Download latest Cursor AppImage
-        curl -fSL "$download_url" -o "$cursor_path"
+        if ! curl -fSL "$download_url" -o "$cursor_path"; then
+            print_warning "Failed to download Cursor, skipping"
+            rm -f "$cursor_path"
+            return 0
+        fi
         chmod +x "$cursor_path"
 
         # Create symlink so 'cursor' command works (for extension installation, etc.)
@@ -534,17 +551,22 @@ setup_aws_toolbox() {
         print_header "Creating AWS toolbox with SSM plugin..."
         toolbox create dev-tools -y 2>/dev/null || true
 
-        # Install AWS CLI and SSM plugin inside the toolbox
-        toolbox run -c dev-tools bash -c '
+        # SSM plugin uses its own arch spelling: linux_64bit / linux_arm64
+        local ssm_arch="linux_64bit"
+        [ "$ARCH" = "aarch64" ] && ssm_arch="linux_arm64"
+
+        # Install AWS CLI and SSM plugin inside the toolbox. Double-quoted so
+        # $ARCH/$ssm_arch expand on the host before the container runs this.
+        toolbox run -c dev-tools bash -c "
             cd /tmp
-            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o awscliv2.zip
+            curl -fsSL 'https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip' -o awscliv2.zip
             unzip -q awscliv2.zip
             sudo ./aws/install
             rm -rf aws awscliv2.zip
-            curl -fsSL "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/linux_64bit/session-manager-plugin.rpm" -o ssm-plugin.rpm
+            curl -fsSL 'https://s3.amazonaws.com/session-manager-downloads/plugin/latest/${ssm_arch}/session-manager-plugin.rpm' -o ssm-plugin.rpm
             sudo dnf install -y ssm-plugin.rpm
             rm ssm-plugin.rpm
-        '
+        " || print_warning "AWS toolbox setup failed"
     fi
 
     # Create a wrapper script so you can run `aws-ecs-exec` from the host
@@ -598,6 +620,21 @@ install_proton_authenticator() {
     fi
 }
 
+# LM Studio — x86_64 only; upstream ships no Linux aarch64 build
+install_lmstudio() {
+    if [ "${ARCH:-unknown}" != "x86_64" ]; then
+        print_warning "LM Studio has no Linux $ARCH build, skipping"
+        return 0
+    fi
+
+    if [ -d "$HOME/.lmstudio" ]; then
+        print_success "LM Studio already installed"
+    else
+        print_header "Installing LM Studio..."
+        curl -fsSL https://lmstudio.ai/install.sh | bash || print_warning "LM Studio install failed"
+    fi
+}
+
 # Main
 install_nvm
 install_rust
@@ -611,6 +648,7 @@ install_aws
 setup_aws_toolbox
 install_proton_authenticator
 install_cursor
+install_lmstudio
 install_synthwave_theme
 install_vscode_extensions
 

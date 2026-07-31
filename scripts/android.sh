@@ -27,7 +27,13 @@ AVD_NAME="Pixel_8_API_36"
 ANDROID_API="36"
 BUILD_TOOLS="36.0.0"
 NDK_VERSION="27.1.12297006"
-SYSTEM_IMAGE="system-images;android-${ANDROID_API};google_apis;x86_64"
+# Emulator system image and JDK must match the host CPU — an x86_64 image will
+# not boot on aarch64 (and vice versa).
+case "$(uname -m)" in
+    aarch64|arm64) EMU_ABI="arm64-v8a"; JDK_ARCH="aarch64" ;;
+    *)             EMU_ABI="x86_64";    JDK_ARCH="x64" ;;
+esac
+SYSTEM_IMAGE="system-images;android-${ANDROID_API};google_apis;${EMU_ABI}"
 
 # install.sh defines these and sources its scripts; `make android` runs this one
 # standalone, so fall back to equivalents when they aren't already in scope.
@@ -110,7 +116,7 @@ install_jdk() {
     mkdir -p "$JDK_ROOT"
     local tmp; tmp="$(mktemp -d)"
     curl -sSL --retry 5 --retry-all-errors -o "$tmp/jdk.tar.gz" \
-        "https://api.adoptium.net/v3/binary/latest/${JDK_VERSION}/ga/linux/x64/jdk/hotspot/normal/eclipse"
+        "https://api.adoptium.net/v3/binary/latest/${JDK_VERSION}/ga/linux/${JDK_ARCH}/jdk/hotspot/normal/eclipse"
     tar -xzf "$tmp/jdk.tar.gz" -C "$JDK_ROOT"
     rm -rf "$tmp"
 }
