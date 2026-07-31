@@ -48,10 +48,11 @@ cd ~/.dotfiles
 - **[SynthWave '84 Dark](https://github.com/z-bones/synthwave-dark)** - Custom dark variant for VS Code/Cursor
 
 ### Applications (Flatpak)
-- Brave Browser
+- Zen Browser
 - Obsidian
-- LocalSend
 - Audacity
+- Raspberry Pi Imager
+- OBS Studio
 
 ### Manual Install
 - [DaVinci Resolve](https://www.blackmagicdesign.com/products/davinciresolve)
@@ -129,7 +130,10 @@ than failing the run:
 | AWS CLI, Cursor, Supabase, Temurin JDK, SSM plugin | native build used |
 | Android emulator image | `arm64-v8a` instead of `x86_64` |
 | LM Studio | skipped — no Linux ARM build |
-| Brave (Flatpak) | skipped — x86_64-only on Flathub |
+| OBS Studio (Flatpak) | skipped — x86_64-only on Flathub |
+
+Zen Browser, Obsidian, Audacity and Raspberry Pi Imager all publish `aarch64`
+Flatpaks, so the desktop apps come across intact.
 
 ## Laptop vs Desktop
 

@@ -35,10 +35,8 @@ SWAY_PACKAGES=(
 # Flatpak apps to install
 FLATPAK_APPS=(
     "app.zen_browser.zen"
-    "com.brave.Browser"
     "md.obsidian.Obsidian"
     "org.audacityteam.Audacity"
-    "org.localsend.localsend_app"
     "org.raspberrypi.rpi-imager"
     "com.obsproject.Studio"
 )
