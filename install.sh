@@ -16,6 +16,22 @@ if [ "$ARCH" = "unknown" ]; then
     print_warning "Unrecognised architecture $(uname -m) — arch-specific installs will be skipped"
 fi
 
+# An unrecognised distro used to be a one-line warning that scrolled past,
+# after which every package install silently did nothing and the failures only
+# surfaced much later as missing compilers and tools. Make it impossible to miss.
+if [ "$DISTRO" = "unknown" ]; then
+    print_error "Unrecognised distro — no packages can be installed"
+    echo ""
+    echo "  /etc/os-release reports:"
+    sed -n 's/^\(ID\|ID_LIKE\|NAME\|VARIANT\)=/    \0/p' /etc/os-release 2>/dev/null
+    echo ""
+    echo "  Add its ID (or ID_LIKE) to detect_distro() in scripts/lib.sh."
+    echo ""
+    read -p "  Continue anyway? Packages will be skipped. [y/N] " -n 1 -r
+    echo ""
+    [[ $REPLY =~ ^[Yy]$ ]] || exit 1
+fi
+
 # Bootstrap: install git and curl if missing
 bootstrap_deps() {
     local missing=()

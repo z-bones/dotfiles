@@ -21,19 +21,32 @@ print_success() { echo -e "${GREEN}✓${NC} $1"; }
 print_warning() { echo -e "${YELLOW}!${NC} $1"; }
 print_error()   { echo -e "${RED}✗${NC} $1"; }
 
-# Detect distro family
+# Detect distro family.
+#
+# Matching $ID exactly is too brittle: Fedora Asahi Remix reports an ID that is
+# not a bare "fedora", which resolved to "unknown" and made packages.sh skip
+# every install — including gcc, which then broke anything needing a compiler.
+#
+# Check $ID first, then fall back to each entry in $ID_LIKE, so downstream
+# remixes and derivatives resolve to the family they are built on. Globs catch
+# hyphenated IDs like "fedora-asahi-remix".
 detect_distro() {
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        case "$ID" in
-            ubuntu|debian|pop|linuxmint)   echo "debian" ;;
-            fedora|rhel|centos|rocky|alma) echo "fedora" ;;
-            arch|manjaro|endeavouros)      echo "arch"   ;;
-            *)                             echo "unknown" ;;
+    [ -f /etc/os-release ] || { echo "unknown"; return; }
+    . /etc/os-release
+
+    local id
+    for id in ${ID:-} ${ID_LIKE:-}; do
+        case "$id" in
+            ubuntu*|debian*|pop*|linuxmint*|raspbian*|elementary*)
+                echo "debian"; return ;;
+            fedora*|rhel*|centos*|rocky*|alma*|nobara*)
+                echo "fedora"; return ;;
+            arch*|manjaro*|endeavouros*|cachyos*|garuda*)
+                echo "arch";   return ;;
         esac
-    else
-        echo "unknown"
-    fi
+    done
+
+    echo "unknown"
 }
 
 # Detect CPU architecture, normalised to the spellings upstream projects use.
