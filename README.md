@@ -29,6 +29,10 @@ cd ~/.dotfiles
 - **Supabase CLI** - Supabase local development and management
 - **AWS CLI v2** - Amazon Web Services command line interface
 - **Cursor** - AI-powered code editor (AppImage)
+- **croc** - Encrypted peer-to-peer file transfer. Installed from upstream
+  releases into `~/.local/bin`, *not* from the distro package: Fedora ships
+  9.6.4 and croc requires clients >=9.6.16 to interoperate, so the packaged
+  build cannot talk to a current croc on another machine.
 
 ### Global NPM Packages
 - yarn

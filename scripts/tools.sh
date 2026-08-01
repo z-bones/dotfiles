@@ -663,6 +663,48 @@ install_proton_authenticator() {
     fi
 }
 
+# croc — encrypted peer-to-peer file transfer.
+#
+# Deliberately NOT the distro package. Fedora 43 ships croc 9.6.4, and upstream
+# states clients must be >=9.6.16 to interoperate, so the repo build cannot talk
+# to a current croc on another machine. Install the latest upstream release into
+# ~/.local/bin so every machine ends up on the same version.
+install_croc() {
+    if command -v croc &> /dev/null; then
+        print_success "croc already installed ($(croc --version 2>/dev/null | head -1))"
+        return 0
+    fi
+
+    local croc_arch
+    case "${ARCH:-unknown}" in
+        x86_64)  croc_arch="Linux-64bit" ;;
+        aarch64) croc_arch="Linux-ARM64" ;;
+        *)       print_warning "No croc build for ${ARCH:-unknown}, skipping"; return 0 ;;
+    esac
+
+    print_header "Installing croc..."
+    local version
+    version=$(curl -fsSL https://api.github.com/repos/schollz/croc/releases/latest \
+        | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
+    version="${version#v}"
+    if [ -z "$version" ]; then
+        print_warning "Could not detect croc version, skipping"
+        return 0
+    fi
+
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+    if curl -fsSL "https://github.com/schollz/croc/releases/download/v${version}/croc_v${version}_${croc_arch}.tar.gz" \
+        -o "$tmp_dir/croc.tar.gz" && tar -xzf "$tmp_dir/croc.tar.gz" -C "$tmp_dir" croc; then
+        mkdir -p "$HOME/.local/bin"
+        install -m 0755 "$tmp_dir/croc" "$HOME/.local/bin/croc"
+        print_success "croc $version installed to ~/.local/bin"
+    else
+        print_warning "Failed to install croc"
+    fi
+    rm -rf "$tmp_dir"
+}
+
 # LM Studio — x86_64 only; upstream ships no Linux aarch64 build
 install_lmstudio() {
     if [ "${ARCH:-unknown}" != "x86_64" ]; then
@@ -696,6 +738,7 @@ INSTALLERS=(
     install_aws
     setup_aws_toolbox
     install_proton_authenticator
+    install_croc
     install_cursor
     install_lmstudio
     install_synthwave_theme
