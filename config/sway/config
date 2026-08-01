@@ -42,8 +42,15 @@ default_floating_border pixel 2
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
 # Requires: desktop-backgrounds-compat, swaybg, jxl-pixbuf-loader
 # output * bg /usr/share/backgrounds/default-dark.jxl fill
-# Set via a script so a missing image degrades to a distro wallpaper and then
-# to a solid colour, instead of leaving sway with no background at all.
+# Set the background directly. This is the proven path: it applies at config
+# parse time with no script, no IPC and no timing dependency.
+output * bg $HOME/.dotfiles/wallpapers/moon.jpg fill
+
+# Supplement, not replacement. If the file above is missing the directive above
+# silently does nothing, and this falls back to a distro wallpaper and then to a
+# solid colour. If the script fails, the line above has already done the job.
+# Replacing the directive with the script alone was a regression — it made the
+# background depend on the script succeeding.
 exec_always ~/.config/sway/wallpaper.sh
 
 #

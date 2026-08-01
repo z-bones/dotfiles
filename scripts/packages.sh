@@ -70,6 +70,12 @@ FLATPAK_APPS=(
 INSTALL_PACKAGES=("${COMMON_PACKAGES[@]}")
 if command -v sway &> /dev/null; then
     INSTALL_PACKAGES+=("${SWAY_PACKAGES[@]}")
+    # Our sway config's `include` line calls /usr/libexec/sway/layered-include,
+    # which is owned by sway-config-fedora — and `sway` does not depend on it,
+    # not even a Recommends. Without it the include fails and NOTHING in
+    # config.d loads: no bar, no laptop.conf. It ships in the Fedora Sway spin,
+    # so this only bites when sway is added by hand to another spin.
+    [ "${DISTRO:-}" = "fedora" ] && INSTALL_PACKAGES+=(sway-config-fedora)
 fi
 case "${DISTRO:-unknown}" in
     debian) INSTALL_PACKAGES+=("${DEBIAN_EXTRA[@]}") ;;
