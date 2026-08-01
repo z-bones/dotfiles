@@ -54,6 +54,9 @@ link_file "$DOTFILES_DIR/config/sway/wallpaper.sh" "$HOME/.config/sway/wallpaper
 # Drop-ins, picked up by the config.d include at the bottom of config
 if command -v sway &> /dev/null; then
     link_file "$DOTFILES_DIR/config/sway/config.d/android-emulator.conf" "$HOME/.config/sway/config.d/android-emulator.conf"
+    # Must keep the 90-bar.conf name — layered-include matches on basename, so
+    # this replaces the distro drop-in instead of adding a second bar.
+    link_file "$DOTFILES_DIR/config/sway/config.d/90-bar.conf" "$HOME/.config/sway/config.d/90-bar.conf"
 
     # Touchpad, lid switch, idle-lock and brightness keys only make sense on a
     # laptop. A battery under /sys/class/power_supply is the portable tell.

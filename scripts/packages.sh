@@ -36,6 +36,7 @@ ARCH_EXTRA=(python-pynvim tailscale)
 # Sway session extras. Referenced by config.d/laptop.conf (brightness keys,
 # idle-lock) and by the volume bindings, so install them wherever sway runs.
 SWAY_PACKAGES=(
+    waybar
     brightnessctl
     swayidle
     swaylock
