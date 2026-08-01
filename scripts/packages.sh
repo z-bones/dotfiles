@@ -63,10 +63,38 @@ case "${DISTRO:-unknown}" in
     arch)   INSTALL_PACKAGES+=("${ARCH_EXTRA[@]}")   ;;
 esac
 
+# Run the package manager over a list, tolerating individual failures.
+#
+# dnf, apt and pacman all fail the *entire* transaction when one name is
+# unknown for the distro or arch. Under `set -e` that aborted the whole run and
+# left nothing installed — one unavailable package could silently cost you
+# every other one. Try the batch first (fast path), and only on failure retry
+# one at a time so a single bad name cannot block the rest.
+PM_CMD=()
+pm_install() {
+    local pkgs=("$@")
+    [ ${#pkgs[@]} -eq 0 ] && return 0
+
+    if "${PM_CMD[@]}" "${pkgs[@]}"; then
+        return 0
+    fi
+
+    print_warning "Batch install failed — retrying package by package"
+    local failed=() p
+    for p in "${pkgs[@]}"; do
+        "${PM_CMD[@]}" "$p" || failed+=("$p")
+    done
+    if [ ${#failed[@]} -gt 0 ]; then
+        print_warning "Could not install: ${failed[*]}"
+    fi
+    return 0
+}
+
 install_debian() {
     print_header "Installing packages via apt..."
     sudo apt update
-    sudo apt install -y "${INSTALL_PACKAGES[@]}" build-essential flatpak
+    PM_CMD=(sudo apt install -y)
+    pm_install "${INSTALL_PACKAGES[@]}" build-essential flatpak
 
     # Add Flathub if not present
     if ! flatpak remotes | grep -q flathub; then
@@ -84,14 +112,19 @@ install_fedora() {
         rpm-ostree)
             # rpm-ostree doesn't support groups like @development-tools
             # flatpak is pre-installed on immutable Fedora
-            sudo rpm-ostree install -y --allow-inactive --idempotent "${INSTALL_PACKAGES[@]}"
+            PM_CMD=(sudo rpm-ostree install -y --allow-inactive --idempotent)
+            pm_install "${INSTALL_PACKAGES[@]}"
             print_warning "System packages will be available after reboot"
             ;;
         dnf5)
-            sudo dnf5 install -y "${INSTALL_PACKAGES[@]}" @development-tools flatpak
+            PM_CMD=(sudo dnf5 install -y)
+            pm_install "${INSTALL_PACKAGES[@]}"
+            pm_install @development-tools flatpak
             ;;
         dnf)
-            sudo dnf install -y "${INSTALL_PACKAGES[@]}" @development-tools flatpak
+            PM_CMD=(sudo dnf install -y)
+            pm_install "${INSTALL_PACKAGES[@]}"
+            pm_install @development-tools flatpak
             ;;
         *)
             print_error "No supported package manager found"
@@ -108,7 +141,9 @@ install_fedora() {
 
 install_arch() {
     print_header "Installing packages via pacman..."
-    sudo pacman -Syu --noconfirm "${INSTALL_PACKAGES[@]}" base-devel flatpak
+    sudo pacman -Sy --noconfirm
+    PM_CMD=(sudo pacman -S --noconfirm --needed)
+    pm_install "${INSTALL_PACKAGES[@]}" base-devel flatpak
 
     if ! flatpak remotes | grep -q flathub; then
         print_header "Adding Flathub repository..."
