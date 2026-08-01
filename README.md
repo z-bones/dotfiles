@@ -29,6 +29,11 @@ cd ~/.dotfiles
 - **Supabase CLI** - Supabase local development and management
 - **AWS CLI v2** - Amazon Web Services command line interface
 - **Cursor** - AI-powered code editor (AppImage)
+- **Neovim** - Editor, with the Python provider (`python3-neovim`)
+- **Tailscale** - Mesh VPN. The service is enabled automatically; log in
+  separately with `sudo tailscale up`.
+- **podman-compose** - Compose for podman, pairs with the `DOCKER_HOST`
+  podman socket set in the shell configs
 - **croc** - Encrypted peer-to-peer file transfer. Installed from upstream
   releases into `~/.local/bin`, *not* from the distro package: Fedora ships
   9.6.4 and croc requires clients >=9.6.16 to interoperate, so the packaged

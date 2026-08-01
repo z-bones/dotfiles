@@ -21,7 +21,17 @@ COMMON_PACKAGES=(
     tree
     tmux
     pass
+    neovim
+    podman-compose
 )
+
+# Packages whose names differ by distro, or that not every distro carries.
+# Neovim's Python provider is python3-neovim on Fedora, python3-pynvim on
+# Debian and python-pynvim on Arch. Tailscale is in Fedora's and Arch's own
+# repos but needs pkgs.tailscale.com on Debian, so it is omitted there.
+DEBIAN_EXTRA=(python3-pynvim)
+FEDORA_EXTRA=(python3-neovim tailscale)
+ARCH_EXTRA=(python-pynvim tailscale)
 
 # Sway session extras. Referenced by config.d/laptop.conf (brightness keys,
 # idle-lock) and by the volume bindings, so install them wherever sway runs.
@@ -41,11 +51,17 @@ FLATPAK_APPS=(
     "com.obsproject.Studio"
 )
 
-# Final install list: base packages, plus the sway extras when sway is present.
+# Final install list: base packages, the sway extras when sway is present, and
+# the per-distro names.
 INSTALL_PACKAGES=("${COMMON_PACKAGES[@]}")
 if command -v sway &> /dev/null; then
     INSTALL_PACKAGES+=("${SWAY_PACKAGES[@]}")
 fi
+case "${DISTRO:-unknown}" in
+    debian) INSTALL_PACKAGES+=("${DEBIAN_EXTRA[@]}") ;;
+    fedora) INSTALL_PACKAGES+=("${FEDORA_EXTRA[@]}") ;;
+    arch)   INSTALL_PACKAGES+=("${ARCH_EXTRA[@]}")   ;;
+esac
 
 install_debian() {
     print_header "Installing packages via apt..."
@@ -100,6 +116,36 @@ install_arch() {
     fi
 }
 
+# Tailscale ships tailscaled.service but leaves it disabled. Enable it if the
+# unit is actually present — on rpm-ostree the package only materialises after a
+# reboot, so this is a no-op until then. Logging in stays manual: `tailscale up`
+# opens a browser for auth and shouldn't run unattended.
+setup_tailscale() {
+    if [ -f /.dockerenv ] || [ -f /run/.containerenv ]; then
+        return 0
+    fi
+    if ! systemctl cat tailscaled.service &> /dev/null; then
+        print_warning "tailscaled.service not found — reboot first on atomic hosts, then: make packages"
+        return 0
+    fi
+
+    if systemctl is-enabled --quiet tailscaled 2>/dev/null; then
+        print_success "tailscaled already enabled"
+    else
+        print_header "Enabling tailscaled..."
+        sudo systemctl enable --now tailscaled || {
+            print_warning "Could not enable tailscaled"
+            return 0
+        }
+    fi
+
+    if tailscale status &> /dev/null; then
+        print_success "Tailscale connected"
+    else
+        print_warning "Tailscale not logged in — run: sudo tailscale up"
+    fi
+}
+
 install_flatpaks() {
     # Skip if flatpak not available or not functional (e.g., in containers)
     if ! command -v flatpak &> /dev/null; then
@@ -141,6 +187,7 @@ case "${DISTRO:-unknown}" in
         ;;
 esac
 
+setup_tailscale
 install_flatpaks
 
 print_success "Package installation complete"
