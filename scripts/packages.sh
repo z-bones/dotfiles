@@ -35,8 +35,21 @@ ARCH_EXTRA=(python-pynvim tailscale)
 
 # Sway session extras. Referenced by config.d/laptop.conf (brightness keys,
 # idle-lock) and by the volume bindings, so install them wherever sway runs.
+# Sway session extras. Everything our configs actually invoke, because none of
+# it can be assumed present: on Fedora Sway Atomic these ship in the base image,
+# but on a GNOME install with sway added by hand none of them exist.
+#   foot        - terminal launched by config/sway/startup.sh
+#   rofi        - $menu launcher bound in config/sway/config
+#   waybar      - the bar, launched by config.d/90-bar.conf
+#   pavucontrol - waybar's pulseaudio on-click handler
+#   wireplumber - provides wpctl, used by the volume keys in laptop.conf
+# swaymsg and swaynag come from sway itself, which must already be installed
+# for this list to be used at all.
 SWAY_PACKAGES=(
+    foot
+    rofi
     waybar
+    pavucontrol
     brightnessctl
     swayidle
     swaylock
