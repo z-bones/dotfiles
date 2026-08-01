@@ -255,3 +255,20 @@ bindsym $mod+r mode "resize"
 # the trick, it's all in the `wordexp(3)`.
 #
 include '$(/usr/libexec/sway/layered-include "/usr/share/sway/config.d/*.conf" "/etc/sway/config.d/*.conf" "${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d/*.conf")'
+
+### Status Bar: waybar
+#
+# Declared HERE, in the main config, rather than in config.d — the include
+# above needs /usr/libexec/sway/layered-include, which ships in
+# sway-config-fedora. Where that is missing (sway added by hand to a non-Sway
+# spin) the include fails, no drop-in loads, and a bar defined in config.d
+# would never appear.
+#
+# Our config.d/90-bar.conf is deliberately EMPTY. When the include does work,
+# layered-include matches on basename and the user copy wins, so the empty file
+# neutralises the distro's /usr/share/sway/config.d/90-bar.conf. That is the
+# idiom documented above. Net result: exactly one bar, this one, whether or not
+# config.d loads.
+bar {
+    swaybar_command waybar
+}
