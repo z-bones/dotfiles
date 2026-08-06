@@ -233,28 +233,33 @@ mode "resize" {
 }
 bindsym $mod+r mode "resize"
 
-# Include configs from 3 locations:
-#  - /usr/share/sway/config.d
-#  - /etc/sway/config.d
-#  - $XDG_CONFIG_HOME/sway/config.d ($HOME/.config/sway/config.d)
+# Include drop-ins from two locations, using sway's own glob include.
 #
-# If multiple directories contain the files with the same name, the later
-# directory takes precedence; `$XDG_CONFIG_HOME/sway/config.d/20-swayidle.conf`
-# will always be loaded instead of `/usr/share/sway/config.d/20-swayidle.conf`
-# or `/etc/sway/config.d/20-swayidle.conf`
+#  - /etc/sway/config.d          system integration (sway-systemd)
+#  - ~/.config/sway/config.d     ours, symlinked by scripts/symlinks.sh
 #
-# This mechanism permits overriding our default configuration per-system
-# (/etc) or per-user ($XDG_CONFIG_HOME) basis. Just create the file you
-# want to modify/override in the higher-level directory.
+# This deliberately does NOT use the Fedora Sway Spin idiom:
 #
-# For example, to disable the default bar from Fedora configs, you'll need to
-#     $ echo -n > "$HOME/.config/sway/config.d/90-bar.conf"
+#   include '$(/usr/libexec/sway/layered-include "/usr/share/sway/config.d/*.conf" ...)'
 #
-# Note the quoting, the $() and the arguments quoting. All the parts are equally
-# important to make the magic work. And if you want to learn the secret behind
-# the trick, it's all in the `wordexp(3)`.
+# That helper ships in sway-config-fedora, which `sway` does not depend on. This
+# is a KDE Plasma spin with sway added by hand, so the helper was absent, the
+# include failed silently, and NOT ONE drop-in loaded — laptop.conf, the
+# android-emulator rules and sway-systemd's session setup were all dead while
+# looking perfectly well configured. `sway --validate` exits 0 either way, so
+# nothing surfaces the breakage. The bar was moved into this file for the same
+# reason; this finishes that job for the rest of the drop-ins.
 #
-include '$(/usr/libexec/sway/layered-include "/usr/share/sway/config.d/*.conf" "/etc/sway/config.d/*.conf" "${XDG_CONFIG_HOME:-$HOME/.config}/sway/config.d/*.conf")'
+# Installing sway-config-fedora is the other possible fix, and it is the wrong
+# one here: it also drops 60-bindings-brightness.conf, 60-bindings-volume.conf
+# and 90-swayidle.conf into /usr/share/sway/config.d, which duplicate bindings
+# config.d/laptop.conf already defines and start a SECOND swayidle — so every
+# idle timeout would fire two swaylocks. Not loading /usr/share at all keeps one
+# owner for each binding, whether or not that package is ever installed.
+#
+# Order matters: later files override earlier ones, so ours land last.
+include /etc/sway/config.d/*.conf
+include $HOME/.config/sway/config.d/*.conf
 
 ### Status Bar: waybar
 #
@@ -264,11 +269,12 @@ include '$(/usr/libexec/sway/layered-include "/usr/share/sway/config.d/*.conf" "
 # spin) the include fails, no drop-in loads, and a bar defined in config.d
 # would never appear.
 #
-# Our config.d/90-bar.conf is deliberately EMPTY. When the include does work,
-# layered-include matches on basename and the user copy wins, so the empty file
-# neutralises the distro's /usr/share/sway/config.d/90-bar.conf. That is the
-# idiom documented above. Net result: exactly one bar, this one, whether or not
-# config.d loads.
+# Kept here even though the include above no longer reads
+# /usr/share/sway/config.d, so the distro's competing 90-bar.conf can no longer
+# load and there is nothing left to race. Declaring the bar in the main config
+# is still the right home: it does not depend on any drop-in resolving.
+#
+# config.d/90-bar.conf is consequently now inert — see the note in that file.
 bar {
     swaybar_command waybar
 }

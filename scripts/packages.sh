@@ -70,12 +70,18 @@ FLATPAK_APPS=(
 INSTALL_PACKAGES=("${COMMON_PACKAGES[@]}")
 if command -v sway &> /dev/null; then
     INSTALL_PACKAGES+=("${SWAY_PACKAGES[@]}")
-    # Our sway config's `include` line calls /usr/libexec/sway/layered-include,
-    # which is owned by sway-config-fedora — and `sway` does not depend on it,
-    # not even a Recommends. Without it the include fails and NOTHING in
-    # config.d loads: no bar, no laptop.conf. It ships in the Fedora Sway spin,
-    # so this only bites when sway is added by hand to another spin.
-    [ "${DISTRO:-}" = "fedora" ] && INSTALL_PACKAGES+=(sway-config-fedora)
+    # sway-config-fedora is deliberately NOT installed.
+    #
+    # It was added here to supply /usr/libexec/sway/layered-include, which the
+    # old `include` line in config/sway/config depended on — without it the
+    # include failed and nothing in config.d loaded. That include has since been
+    # replaced with sway's native glob include, so the helper is no longer
+    # needed by anything we ship.
+    #
+    # Installing it now would be actively harmful: it also drops
+    # 60-bindings-brightness.conf, 60-bindings-volume.conf and 90-swayidle.conf
+    # into /usr/share/sway/config.d, duplicating bindings config.d/laptop.conf
+    # already owns and starting a second swayidle.
 fi
 case "${DISTRO:-unknown}" in
     debian) INSTALL_PACKAGES+=("${DEBIAN_EXTRA[@]}") ;;
