@@ -62,8 +62,9 @@ if command -v sway &> /dev/null; then
     link_file "$DOTFILES_DIR/config/sway/config.d/90-bar.conf" "$HOME/.config/sway/config.d/90-bar.conf"
 
     # Touchpad, lid switch, idle-lock and brightness keys only make sense on a
-    # laptop. A battery under /sys/class/power_supply is the portable tell.
-    if compgen -G "/sys/class/power_supply/BAT*" > /dev/null; then
+    # laptop. A battery under /sys/class/power_supply is the portable tell —
+    # see has_battery() in lib.sh for why this is not a BAT* glob.
+    if has_battery; then
         link_file "$DOTFILES_DIR/config/sway/config.d/laptop.conf" "$HOME/.config/sway/config.d/laptop.conf"
         print_success "Laptop detected — linked laptop.conf"
     else

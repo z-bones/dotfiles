@@ -146,11 +146,17 @@ Flatpaks, so the desktop apps come across intact.
 
 ## Laptop vs Desktop
 
-`config/sway/config.d/laptop.conf` holds touchpad, lid-switch, idle-lock and
-brightness-key settings. `symlinks.sh` links it only when the host has a battery
-(`/sys/class/power_supply/BAT*`), so one branch serves both machines. Waybar's
-`backlight` and `battery` modules are always declared — Waybar disables a module
-whose hardware is absent.
+`config/sway/config.d/laptop.conf` holds touchpad, lid-switch, idle-lock,
+brightness and keyboard-backlight settings. `symlinks.sh` links it only when the
+host has a battery, so one branch serves both machines. Waybar's `backlight` and
+`battery` modules are always declared — Waybar disables a module whose hardware
+is absent.
+
+The battery test is `has_battery()` in `lib.sh`, which scans
+`/sys/class/power_supply/*/type` for `Battery` rather than globbing for `BAT*`.
+`BAT0` is an ACPI convention: Apple Silicon names its battery `macsmc-battery`,
+so the old glob silently skipped `laptop.conf` on the MacBook and left the
+brightness keys, lid switch and idle lock dead.
 
 ## Make Commands
 

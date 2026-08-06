@@ -58,6 +58,28 @@ detect_arch() {
     esac
 }
 
+# Is this host a laptop? Answered by asking whether any power supply is a
+# battery.
+#
+# Do NOT glob for /sys/class/power_supply/BAT* — "BAT0" is an ACPI naming
+# convention, not a kernel guarantee. Apple Silicon exposes the battery through
+# the SMC driver as "macsmc-battery", so a BAT* glob reports "no battery" on a
+# MacBook and silently skips laptop.conf, leaving the brightness keys, lid
+# switch, idle lock and touchpad settings all dead. Same class of bug as the
+# $ID matching above: a portable check written against one vendor's spelling.
+#
+# Reading */type and matching "Battery" is naming-independent — it is the
+# documented power_supply class ABI, and it also excludes the AC adapter and
+# the USB-C PD controllers, which sit in the same directory.
+has_battery() {
+    local type_file
+    for type_file in /sys/class/power_supply/*/type; do
+        [ -r "$type_file" ] || continue
+        [ "$(cat "$type_file")" = "Battery" ] && return 0
+    done
+    return 1
+}
+
 # Detect Fedora package manager (rpm-ostree for immutable, dnf5/dnf otherwise)
 detect_fedora_pkg_mgr() {
     if command -v rpm-ostree &> /dev/null && rpm-ostree status &> /dev/null; then
