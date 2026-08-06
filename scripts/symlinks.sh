@@ -44,6 +44,9 @@ fi
 # Alacritty
 link_file "$DOTFILES_DIR/config/alacritty/alacritty.toml" "$HOME/.config/alacritty/alacritty.toml"
 
+# Foot (sway's $term)
+link_file "$DOTFILES_DIR/config/foot/foot.ini" "$HOME/.config/foot/foot.ini"
+
 # Starship
 link_file "$DOTFILES_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 
