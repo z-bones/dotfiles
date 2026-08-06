@@ -53,7 +53,7 @@ button:hover {
 } */
 
 #workspaces button {
-    padding: 0 5px;
+    padding: 0 10px;
     background-color: transparent;
     color: #ffffff;
 }
@@ -113,30 +113,30 @@ button:hover {
 }
 
 #clock {
-    background-color: #101518;
+    background-color: transparent;
 }
 
 #battery {
-    background-color: #ffffff;
-    color: #000000;
+    background-color: transparent;
 }
 
+/* State is signalled by glyph + text colour only — no background blocks, so
+   these sit visually level with the other right-hand modules. */
 #battery.charging, #battery.plugged {
-    color: #ffffff;
-    background-color: #26A65B;
+    background-color: transparent;
+    color: #26A65B;
 }
 
 @keyframes blink {
     to {
-        background-color: #ffffff;
-        color: #000000;
+        color: #ffffff;
     }
 }
 
 /* Using steps() instead of linear as a timing function to limit cpu usage */
 #battery.critical:not(.charging) {
-    background-color: #f53c3c;
-    color: #ffffff;
+    background-color: transparent;
+    color: #f53c3c;
     animation-name: blink;
     animation-duration: 0.5s;
     animation-timing-function: steps(12);
@@ -148,19 +148,11 @@ button:hover {
     padding-right: 15px;
 }
 
-#power-profiles-daemon.performance {
-    background-color: #f53c3c;
-    color: #ffffff;
-}
-
-#power-profiles-daemon.balanced {
-    background-color: #2980b9;
-    color: #ffffff;
-}
-
+/* Profile is distinguishable by the module's own per-profile glyph. */
+#power-profiles-daemon.performance,
+#power-profiles-daemon.balanced,
 #power-profiles-daemon.power-saver {
-    background-color: #2ecc71;
-    color: #000000;
+    background-color: transparent;
 }
 
 label:focus {
@@ -168,36 +160,37 @@ label:focus {
 }
 
 #cpu {
-    background-color: #101518;
+    background-color: transparent;
 }
 
 #memory {
-    background-color: #101518;
+    background-color: transparent;
 }
 
 #disk {
-    background-color: #964B00;
+    background-color: transparent;
 }
 
 #backlight {
-    background-color: #90b1b1;
+    background-color: transparent;
 }
 
 #network {
-    background-color: #101518;
+    background-color: transparent;
 }
 
 #network.disconnected {
-    background-color: #f53c3c;
+    background-color: transparent;
+    color: #f53c3c;
 }
 
 #pulseaudio {
-    background-color: #101518;
+    background-color: transparent;
 }
 
 #pulseaudio.muted {
-    background-color: #90b1b1;
-    color: #2a5c45;
+    background-color: transparent;
+    color: #90b1b1;
 }
 
 #wireplumber {
@@ -224,15 +217,16 @@ label:focus {
 }
 
 #temperature {
-    background-color: #101518;
+    background-color: transparent;
 }
 
 #temperature.critical {
-    background-color: #eb4d4b;
+    background-color: transparent;
+    color: #eb4d4b;
 }
 
 #tray {
-    background-color: #101518;
+    background-color: transparent;
 }
 
 #tray > .passive {
@@ -245,12 +239,12 @@ label:focus {
 }
 
 #idle_inhibitor {
-    background-color: #2d3436;
+    background-color: transparent;
 }
 
 #idle_inhibitor.activated {
-    background-color: #ecf0f1;
-    color: #2d3436;
+    background-color: transparent;
+    color: #ecf0f1;
 }
 
 #mpd {
