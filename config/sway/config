@@ -29,11 +29,11 @@ set $menu $rofi_cmd -show combi -combi-modes drun#run -modes combi
 
 
 ### Appearance
-gaps inner 6
-gaps outer 3
+gaps inner 2
+gaps outer 2
 
 # Remove title bars
-default_border pixel 2
+default_border none
 default_floating_border pixel 2
 
 
