@@ -19,6 +19,10 @@ cd ~/.dotfiles
 ### Terminal
 - **Alacritty** - GPU-accelerated terminal with custom color scheme
 
+### CD Authoring
+- **`cd-prep` / `cd-burn` / `cd-album` / `cd-mp3`** - Burn audio and MP3 discs
+  from the shell. See [CD Authoring](#cd-authoring) below.
+
 ### Development Tools
 - **nvm** - Node version manager + Node.js LTS
 - **Rust** - via rustup + Cargo
@@ -71,6 +75,11 @@ cd ~/.dotfiles
 ```
 dotfiles/
 ├── install.sh              # Main bootstrap script
+├── bin/                    # Commands linked onto PATH (~/.local/bin)
+│   ├── cd-prep             # Audio files -> Red Book WAVs
+│   ├── cd-burn             # Burn the staged WAVs as an audio CD
+│   ├── cd-album            # Album folder -> staged disc(s), splits if long
+│   └── cd-mp3              # MP3 data CD (ISO 9660 + Joliet + Rock Ridge)
 ├── scripts/
 │   ├── lib.sh              # Shared helpers + distro/arch detection
 │   ├── packages.sh         # System packages + Flatpaks
@@ -208,6 +217,38 @@ The list has to live in the drop-in rather than in `config.jsonc`: Waybar takes
 the *first* definition of a duplicate key and the including file wins, so a
 `modules-right` in `config.jsonc` could never be overridden by an include.
 Keep the two variants in sync when adding or reordering modules.
+
+## CD Authoring
+
+Four commands in `bin/`, linked into `~/.local/bin` by `symlinks.sh`. They are
+the reason `packages.sh` installs `cdrskin`, `cdrdao`, `xorriso`, `ffmpeg` and
+the audio hand-tools on every host — the workflow is meant to be identical on
+both machines.
+
+| Command | Does |
+| --- | --- |
+| `cd-prep` | Converts any audio to Red Book (16-bit/44.1 kHz/stereo WAV) into a staging dir, and says whether it fits a 74- or 80-minute disc |
+| `cd-burn` | Burns the staged WAVs. `cdrskin` by default; `cdrdao` when you ask for gapless (`-g`) or CD-TEXT |
+| `cd-album` | Wraps `cd-prep` for a whole album folder — works out the running order from tags, splits across discs with `-m` |
+| `cd-mp3` | Builds and burns an MP3 **data** disc. Not an audio CD — needs a player with MP3 support |
+
+The usual run, from an album folder:
+
+```bash
+cd-album -p ~/Music/SomeAlbum   # preview the running order, convert nothing
+cd-album ~/Music/SomeAlbum      # stage it
+cd-burn -n                      # rehearsal: laser off, everything else real
+cd-burn -e                      # burn and eject
+```
+
+Every script takes `-h`. Staging lives under `~/cdburn` (`$CDBURN_ROOT`), the
+burner defaults to `/dev/sr0` (`$CDBURN_DEV`).
+
+Two things worth knowing. `cd-prep` peak-scans lossy sources and attenuates any
+that decode above 0 dBFS — MP3 and AAC routinely do, and writing those straight
+to 16-bit clips them; `-N` turns that off. And `cd-burn -n` is a real rehearsal:
+the drive does everything except fire the laser, which is the cheap way to find
+out a disc is unusable before wasting it.
 
 ## Make Commands
 

@@ -29,9 +29,47 @@ COMMON_PACKAGES=(
 # Neovim's Python provider is python3-neovim on Fedora, python3-pynvim on
 # Debian and python-pynvim on Arch. Tailscale is in Fedora's and Arch's own
 # repos but needs pkgs.tailscale.com on Debian, so it is omitted there.
-DEBIAN_EXTRA=(python3-pynvim)
-FEDORA_EXTRA=(python3-neovim tailscale)
-ARCH_EXTRA=(python-pynvim tailscale)
+#
+# ffmpeg is the CD tooling's hard dependency (see CD_PACKAGES). On Fedora the
+# package to ask for is ffmpeg-free — the Fedora build, in the main repo. Plain
+# `ffmpeg` there is the RPM Fusion build and pulls in a third-party repo we do
+# not otherwise need; ffmpeg-free carries libmp3lame, which is the only encoder
+# any of this needs. Debian and Arch just call it ffmpeg.
+#
+# normalize is `normalize-audio` on Debian.
+DEBIAN_EXTRA=(python3-pynvim ffmpeg normalize-audio)
+FEDORA_EXTRA=(python3-neovim tailscale ffmpeg-free normalize)
+ARCH_EXTRA=(python-pynvim tailscale ffmpeg normalize)
+
+# CD authoring and audio CLI tools, behind the bin/cd-* commands.
+#
+# Hard dependencies of those scripts — without these they refuse to run:
+#   cdrskin  - the default burn engine (cd-burn, cd-mp3), and the media
+#              preflight that tells a blank disc from a full one
+#   cdrdao   - the gapless and CD-TEXT engine, driven by a generated .toc
+#   xorriso  - builds the ISO 9660/Joliet image for cd-mp3 data discs
+#   ffmpeg   - every decode, resample and peak scan in cd-prep (see above for
+#              the package name, which is the one thing that differs by distro)
+#
+# Hand tools for the jobs the scripts do not cover — splitting a single album
+# rip by its cue sheet, checking or re-gaining a file before staging it:
+#   sox      - conversion, trimming and analysis from the shell
+#   flac     - encode/decode and `flac -t` integrity checks on rips
+#   shntool  - splits one long WAV/FLAC into tracks (shnsplit)
+#   cuetools - reads and writes the cue sheets shnsplit splits on
+#   normalize - batch peak/RMS gain across an album before cd-prep sees it
+#
+# Installed on every host, not gated on sway or a desktop: the point of having
+# them here is that the workflow is identical on both machines.
+CD_PACKAGES=(
+    cdrskin
+    cdrdao
+    xorriso
+    sox
+    flac
+    shntool
+    cuetools
+)
 
 # Sway session extras. Everything our configs actually invoke, because none of
 # it can be assumed present: on Fedora Sway Atomic these ship in the base image,
@@ -85,9 +123,9 @@ FLATPAK_APPS=(
     "com.obsproject.Studio"
 )
 
-# Final install list: base packages, the sway extras when sway is present, and
-# the per-distro names.
-INSTALL_PACKAGES=("${COMMON_PACKAGES[@]}")
+# Final install list: base packages, the CD tooling, the sway extras when sway
+# is present, and the per-distro names.
+INSTALL_PACKAGES=("${COMMON_PACKAGES[@]}" "${CD_PACKAGES[@]}")
 if command -v sway &> /dev/null; then
     INSTALL_PACKAGES+=("${SWAY_PACKAGES[@]}")
     # sway-config-fedora is deliberately NOT installed.

@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# cd-mp3 — build and burn an MP3 data CD (ISO 9660 + Joliet + Rock Ridge).
+#
+# This is NOT an audio CD. It is a data disc holding ~150 MP3s, playable in
+# any player with "MP3 CD" support. For a disc that plays in ANY CD player,
+# use cd-prep + cd-burn instead — that writes a real Red Book audio CD.
+#
+# Usage:
+#   cd-mp3 [options] FILE_OR_DIR...
+#
+# Options:
+#   -V LABEL   disc volume label            (default: MP3DISC)
+#   -o ISO     ISO image path               (default: ~/cdburn/mp3disc.iso)
+#   -c         transcode non-MP3 sources to MP3 (default: skip them)
+#   -b RATE    CBR bitrate for -c, e.g. 320 (default: VBR V0, ~245 kbps)
+#   -B         build the ISO only, do not burn
+#   -d DEV     burner device                (default: /dev/sr0, or $CDBURN_DEV)
+#   -s SPEED   write speed                  (default: 16)
+#   -n         dummy burn: laser off
+#   -e         eject when finished
+#   -h         this help
+
+set -euo pipefail
+
+LABEL="MP3DISC"
+ISO="${CDBURN_ISO:-$HOME/cdburn/mp3disc.iso}"
+BUILD="${CDBURN_BUILD:-$HOME/cdburn/mp3build}"
+DEV="${CDBURN_DEV:-/dev/sr0}"
+SPEED=16
+CONVERT=0; BITRATE=""; BUILDONLY=0; DUMMY=0; EJECT=0
+
+# 80-minute CD-R: 359849 sectors x 2048 bytes.
+CAP=736970752
+
+die()  { printf 'cd-mp3: %s\n' "$*" >&2; exit 1; }
+note() { printf '  %s\n' "$*"; }
+usage() { awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0; }
+mb()   { awk -v b="$1" 'BEGIN{printf "%.1f MB", b/1e6}'; }
+
+while getopts ':V:o:b:d:s:cBneh' opt; do
+  case "$opt" in
+    V) LABEL="$OPTARG" ;;
+    o) ISO="$OPTARG" ;;
+    b) BITRATE="$OPTARG" ;;
+    d) DEV="$OPTARG" ;;
+    s) SPEED="$OPTARG" ;;
+    c) CONVERT=1 ;;
+    B) BUILDONLY=1 ;;
+    n) DUMMY=1 ;;
+    e) EJECT=1 ;;
+    h) usage ;;
+    :) die "option -$OPTARG needs a value" ;;
+    \?) die "unknown option -$OPTARG (try -h)" ;;
+  esac
+done
+shift $((OPTIND - 1))
+[[ $# -gt 0 ]] || die "no input files or directories (try -h)"
+
+command -v ffmpeg >/dev/null || die "ffmpeg not found"
+if ! command -v xorriso >/dev/null; then
+  die "xorriso not installed. Run:
+       sudo rpm-ostree install --apply-live xorriso cdrskin cdrdao"
+fi
+
+rm -rf "$BUILD"; mkdir -p "$BUILD" "$(dirname "$ISO")"
+
+AUDIO_RE='.*\.\(mp3\|flac\|m4a\|aac\|wav\|aiff\|aif\|ogg\|opus\|wma\)'
+
+copied=0; converted=0; skipped=0
+
+stage_one() {          # $1 = source file, $2 = destination path under $BUILD
+  local src="$1" dst="$2"
+  mkdir -p "$(dirname "$dst")"
+  if [[ "${src,,}" == *.mp3 ]]; then
+    cp -n -- "$src" "${dst%.*}.mp3"
+    copied=$((copied + 1))
+  elif [[ $CONVERT -eq 1 ]]; then
+    local rate=(-q:a 0)
+    [[ -n "$BITRATE" ]] && rate=(-b:a "${BITRATE}k")
+    ffmpeg -hide_banner -loglevel error -nostdin -y \
+      -i "$src" -map 0:a:0 -vn -map_metadata 0 -id3v2_version 3 \
+      -c:a libmp3lame "${rate[@]}" "${dst%.*}.mp3"
+    converted=$((converted + 1))
+  else
+    skipped=$((skipped + 1))
+  fi
+}
+
+printf '\n  Staging into %s\n' "$BUILD"
+for arg in "$@"; do
+  [[ -e "$arg" ]] || die "no such path: $arg"
+  if [[ -d "$arg" ]]; then
+    # The directory itself becomes a top-level folder on the disc.
+    base=$(dirname -- "${arg%/}")
+    while IFS= read -r -d '' f; do
+      rel="${f#"$base"/}"
+      stage_one "$f" "$BUILD/$rel"
+    done < <(find "$arg" -type f -iregex "$AUDIO_RE" -print0 | sort -z)
+  else
+    stage_one "$arg" "$BUILD/$(basename -- "$arg")"
+  fi
+done
+
+count=$(find "$BUILD" -type f -name '*.mp3' | wc -l)
+[[ "$count" -gt 0 ]] || die "nothing staged. Non-MP3 sources are skipped unless you pass -c."
+
+bytes=$(du -sb "$BUILD" | cut -f1)
+printf '  MP3s copied     : %d\n' "$copied"
+[[ $converted -gt 0 ]] && printf '  Transcoded      : %d\n' "$converted"
+[[ $skipped   -gt 0 ]] && printf '  Skipped non-MP3 : %d  (pass -c to transcode these)\n' "$skipped"
+printf '  Total on disc   : %d files, %s of %s\n\n' "$count" "$(mb "$bytes")" "$(mb "$CAP")"
+
+if [[ "$bytes" -gt "$CAP" ]]; then
+  die "too big for an 80-minute CD-R by $(mb $((bytes - CAP))). Remove some tracks, or use -c -b 192."
+fi
+
+# ---- build the image --------------------------------------------------------
+# -r  Rock Ridge (long names on Linux)   -J Joliet (long names on car/Windows players)
+xorriso -as mkisofs -iso-level 3 -r -J -V "$LABEL" -o "$ISO" "$BUILD" 2>&1 | tail -3
+[[ -s "$ISO" ]] || die "ISO build failed"
+isosize=$(stat -c %s "$ISO")
+printf '\n  ISO: %s (%s)\n' "$ISO" "$(mb "$isosize")"
+[[ "$isosize" -le "$CAP" ]] || die "the finished ISO is larger than an 80-minute CD-R"
+
+if [[ $BUILDONLY -eq 1 ]]; then
+  printf '  Built only (-B). Burn it later with:  cd-mp3 ... (without -B)\n\n'
+  exit 0
+fi
+
+# ---- burn -------------------------------------------------------------------
+command -v cdrskin >/dev/null || die "cdrskin not installed. Run:
+       sudo rpm-ostree install --apply-live cdrskin cdrdao xorriso"
+[[ -b "$DEV" ]] || die "no such burner device: $DEV"
+
+cmd=(cdrskin -v dev="$DEV" speed="$SPEED" -sao)
+[[ $DUMMY -eq 1 ]] && cmd+=(-dummy)
+[[ $EJECT -eq 1 ]] && cmd+=(-eject)
+cmd+=("$ISO")
+note "Running: ${cmd[*]}"
+"${cmd[@]}"
+
+printf '\n  Done.%s\n\n' "$([[ $DUMMY -eq 1 ]] && echo ' (dummy run — nothing written)')"

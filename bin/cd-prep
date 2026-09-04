@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+# cd-prep — convert audio files into Red Book audio-CD tracks.
+#
+# Red Book requires: 16-bit signed PCM, 44100 Hz, stereo, WAV.
+# Outputs numbered WAVs into a staging dir plus a tracks.tsv manifest,
+# and reports whether the program fits on a 74- or 80-minute disc.
+#
+# Lossy sources (MP3/AAC/Vorbis/Opus) routinely decode to peaks ABOVE 0 dBFS.
+# Writing those to 16-bit clips them, so each one is peak-scanned and
+# attenuated just enough to land at -0.2 dBFS. Disable with -N.
+#
+# Usage:
+#   cd-prep [options] FILE...
+#   cd-prep [options] -l PLAYLIST      # one path per line, '#' comments ok
+#
+# Options:
+#   -o DIR    staging dir (default: ~/cdburn/staging)
+#   -l FILE   read the track list from FILE instead of the arguments
+#   -g SEC    gap assumed between tracks when totalling (default: 2)
+#   -k        keep existing staging dir contents (default: wipe first)
+#   -N        no clip guard: skip the peak scan, allow clipping
+#   -h        this help
+
+set -euo pipefail
+
+OUTDIR="${CDBURN_STAGE:-$HOME/cdburn/staging}"
+PLAYLIST=""
+GAP=2
+KEEP=0
+CLIPGUARD=1
+
+die() { printf 'cd-prep: %s\n' "$*" >&2; exit 1; }
+usage() { awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0; }
+
+while getopts ':o:l:g:kNh' opt; do
+  case "$opt" in
+    o) OUTDIR="$OPTARG" ;;
+    l) PLAYLIST="$OPTARG" ;;
+    g) GAP="$OPTARG" ;;
+    k) KEEP=1 ;;
+    N) CLIPGUARD=0 ;;
+    h) usage ;;
+    :) die "option -$OPTARG needs a value" ;;
+    \?) die "unknown option -$OPTARG (try -h)" ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+command -v ffmpeg  >/dev/null || die "ffmpeg not found"
+command -v ffprobe >/dev/null || die "ffprobe not found"
+
+# ---- collect the input list, preserving order -------------------------------
+INPUTS=()
+if [[ -n "$PLAYLIST" ]]; then
+  [[ -r "$PLAYLIST" ]] || die "cannot read playlist: $PLAYLIST"
+  while IFS= read -r line; do
+    line="${line%$'\r'}"
+    [[ -z "${line// /}" || "$line" == \#* ]] && continue
+    INPUTS+=("$line")
+  done < "$PLAYLIST"
+fi
+INPUTS+=("$@")
+[[ ${#INPUTS[@]} -gt 0 ]] || die "no input files (try -h)"
+[[ ${#INPUTS[@]} -le 99 ]] || die "${#INPUTS[@]} tracks; a CD holds at most 99"
+for f in "${INPUTS[@]}"; do [[ -r "$f" ]] || die "cannot read: $f"; done
+
+if [[ $KEEP -eq 0 && -d "$OUTDIR" ]]; then
+  rm -f "$OUTDIR"/*.wav "$OUTDIR"/tracks.tsv "$OUTDIR"/cdtext 2>/dev/null || true
+fi
+mkdir -p "$OUTDIR"
+
+probe() { ffprobe -v error -select_streams a:0 -show_entries "$1" -of default=nw=1:nk=1 "$2" 2>/dev/null; }
+# ID3/Vorbis tags land in the FORMAT section for most containers, so look there first.
+ftag()  { ffprobe -v error -show_entries "format_tags=$1" -of default=nw=1:nk=1 "$2" 2>/dev/null | head -1; }
+hms()   { awk -v s="$1" 'BEGIN{printf "%d:%02d.%02d", int(s/60), int(s)%60, int((s-int(s))*75)}'; }
+
+# Decoded peak in dBFS. Float decode, so values above 0 are reported honestly.
+peak_dbfs() {
+  ffmpeg -hide_banner -nostdin -i "$1" -map 0:a:0 -vn \
+    -af 'aformat=sample_fmts=fltp,astats=measure_perchannel=none:measure_overall=Peak_level' \
+    -f null - 2>&1 | sed -n 's/.*Peak level dB: *\(.*\)/\1/p' | head -1
+}
+
+manifest="$OUTDIR/tracks.tsv"
+printf '#num\tfile\tseconds\tgain_db\ttitle\tperformer\n' > "$manifest"
+
+n=0; total=0; short_tracks=(); guarded=0
+albums=(); artists=()
+
+printf '\n  Preparing %d track(s) -> %s\n\n' "${#INPUTS[@]}" "$OUTDIR"
+printf '  %-3s %-38s %9s  %s\n' "#" "source" "length" "conversion"
+printf '  %s\n' "$(printf '%.0s-' {1..92})"
+
+for f in "${INPUTS[@]}"; do
+  n=$((n + 1))
+  codec=$(probe stream=codec_name "$f")
+  sr=$(probe stream=sample_rate "$f")
+  ch=$(probe stream=channels "$f")
+  sfmt=$(probe stream=sample_fmt "$f")
+  [[ -n "$codec" ]] || die "no audio stream in: $f"
+
+  chain=()
+  gain=0
+
+  # Integer PCM cannot exceed full scale, so only scan lossy or float sources.
+  if [[ $CLIPGUARD -eq 1 ]] \
+     && [[ "$codec" =~ ^(mp3|mp2|aac|vorbis|opus|wmav1|wmav2|ac3|eac3)$ || "$sfmt" =~ ^(flt|fltp|dbl|dblp)$ ]]; then
+    p=$(peak_dbfs "$f")
+    if [[ "$p" =~ ^-?[0-9.]+$ ]] && awk -v p="$p" 'BEGIN{exit !(p > 0)}'; then
+      gain=$(awk -v p="$p" 'BEGIN{printf "%.2f", -(p + 0.2)}')
+      chain+=("volume=${gain}dB")
+      guarded=$((guarded + 1))
+    fi
+  fi
+
+  if [[ "$codec" == pcm_s16le || "$codec" == pcm_s16be ]] \
+     && [[ "$sr" == 44100 ]] && [[ "$ch" == 2 ]] && [[ "$sfmt" == s16 ]] \
+     && [[ ${#chain[@]} -eq 0 ]]; then
+    note="passthrough (already Red Book)"
+  else
+    note="${sr:-?}Hz/${ch:-?}ch/${sfmt:-?} -> 44100/2/s16"
+    chain+=("aresample=resampler=soxr:precision=28:dither_method=triangular")
+    awk -v g="$gain" 'BEGIN{exit !(g != 0)}' && note="$note, ${gain}dB clip guard"
+  fi
+
+  base=$(basename -- "$f"); base="${base%.*}"
+  safe=$(printf '%s' "$base" | tr '/:' '__')
+  out=$(printf '%s/%02d - %s.wav' "$OUTDIR" "$n" "$safe")
+
+  filter=()
+  [[ ${#chain[@]} -gt 0 ]] && filter=(-af "$(IFS=,; echo "${chain[*]}")")
+
+  ffmpeg -hide_banner -loglevel error -nostdin -y \
+    -i "$f" -map 0:a:0 -vn -map_metadata -1 \
+    "${filter[@]+"${filter[@]}"}" \
+    -ar 44100 -ac 2 -c:a pcm_s16le -rf64 never \
+    -fflags +bitexact -flags:a +bitexact \
+    "$out"
+
+  dur=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$out")
+  total=$(awk -v a="$total" -v b="$dur" 'BEGIN{print a+b}')
+  awk -v d="$dur" 'BEGIN{exit !(d < 4)}' && short_tracks+=("$n")
+
+  title=$(ftag title "$f")
+  [[ -n "$title" ]] || title=$(probe stream_tags=title "$f")
+  [[ -n "$title" ]] || title="$base"
+  perf=$(ftag artist "$f")
+  [[ -n "$perf" ]] || perf=$(probe stream_tags=artist "$f")
+  alb=$(ftag album "$f")
+  [[ -n "$alb"  ]] && albums+=("$alb")
+  [[ -n "$perf" ]] && artists+=("$perf")
+
+  printf '%d\t%s\t%s\t%s\t%s\t%s\n' "$n" "$(basename -- "$out")" "$dur" "$gain" "$title" "$perf" >> "$manifest"
+  printf '  %-3s %-38.38s %9s  %s\n' "$n" "$base" "$(hms "$dur")" "$note"
+done
+
+# ---- CD-TEXT hint: only when the whole disc agrees on album/artist ----------
+uniq_of() { printf '%s\n' "$@" | sort -u; }
+if [[ ${#albums[@]} -eq $n ]] && [[ $(uniq_of "${albums[@]}" | wc -l) -eq 1 ]]; then
+  one_album=$(uniq_of "${albums[@]}")
+  one_artist=""
+  [[ ${#artists[@]} -eq $n ]] && [[ $(uniq_of "${artists[@]}" | wc -l) -eq 1 ]] && one_artist=$(uniq_of "${artists[@]}")
+  printf '%s|%s\n' "$one_album" "$one_artist" > "$OUTDIR/cdtext"
+fi
+
+# ---- totals -----------------------------------------------------------------
+gaps=$(awk -v n="$n" -v g="$GAP" 'BEGIN{print (n>1) ? (n-1)*g : 0}')
+prog=$(awk -v t="$total" -v g="$gaps" 'BEGIN{print t+g}')
+
+printf '  %s\n' "$(printf '%.0s-' {1..92})"
+printf '  %-3s %-38s %9s\n' "" "audio"                          "$(hms "$total")"
+printf '  %-3s %-38s %9s\n' "" "+ ${GAP}s gaps x $((n>1?n-1:0))" "$(hms "$gaps")"
+printf '  %-3s %-38s %9s\n' "" "total program"                  "$(hms "$prog")"
+printf '\n'
+
+fits() { awk -v p="$prog" -v lim="$1" 'BEGIN{exit !(p <= lim)}'; }
+if fits 4440; then
+  printf '  Fits a 74-minute disc (and an 80-minute disc).\n'
+elif fits 4797; then
+  printf '  Fits an 80-minute disc. Too long for a 74-minute disc.\n'
+else
+  over=$(awk -v p="$prog" 'BEGIN{print p-4797}')
+  printf '  TOO LONG for an 80-minute disc by %s. Drop a track, or use: cd-album -m\n' "$(hms "$over")"
+fi
+
+[[ $guarded -gt 0 ]] && \
+  printf '  Clip guard applied to %d track(s) that decoded above 0 dBFS.\n' "$guarded"
+[[ -f "$OUTDIR/cdtext" ]] && \
+  printf '  CD-TEXT ready: %s\n' "$(tr '|' '/' < "$OUTDIR/cdtext")"
+if [[ ${#short_tracks[@]} -gt 0 ]]; then
+  printf '  WARNING: track(s) %s are under 4s; Red Book requires a 4s minimum.\n' \
+    "$(IFS=,; echo "${short_tracks[*]}")"
+fi
+
+printf '\n  Manifest: %s\n' "$manifest"
+printf '  Next:     cd-burn -n       # rehearsal, laser off\n'
+printf '            cd-burn -e       # for real\n\n'

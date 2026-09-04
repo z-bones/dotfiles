@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+# cd-burn — burn the WAVs staged by cd-prep as a Red Book audio CD.
+#
+# Two engines:
+#   cdrskin (default)  standard album layout, 2-second gaps between tracks
+#   cdrdao  (-g / -t)  gapless burns and/or CD-TEXT, driven by a generated .toc
+#
+# Usage:
+#   cd-burn [options] [STAGEDIR]        # default staging dir: ~/cdburn/staging
+#
+# Options:
+#   -d DEV     burner device            (default: /dev/sr0, or $CDBURN_DEV)
+#   -s SPEED   write speed              (default: 8 — slow is safer for audio)
+#   -n         dummy run: laser off, everything else real. Do this first.
+#   -g         gapless (no pause between tracks) — uses cdrdao
+#   -t "ALBUM|ARTIST"   write CD-TEXT   — uses cdrdao
+#              (picked up automatically from the staging dir when cd-prep
+#               or cd-album found a consistent album tag; -T turns it off)
+#   -T         no CD-TEXT: ignore the staged tags, stay on cdrskin
+#   -B         blank a CD-RW first
+#   -e         eject when finished
+#   -h         this help
+
+set -euo pipefail
+
+DEV="${CDBURN_DEV:-/dev/sr0}"
+SPEED=8
+STAGE="${CDBURN_STAGE:-$HOME/cdburn/staging}"
+DUMMY=0; GAPLESS=0; EJECT=0; BLANK=0; CDTEXT=""; NOTEXT=0
+
+die()  { printf 'cd-burn: %s\n' "$*" >&2; exit 1; }
+note() { printf '  %s\n' "$*"; }
+usage() { awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0; }
+
+while getopts ':d:s:t:ngBeTh' opt; do
+  case "$opt" in
+    d) DEV="$OPTARG" ;;
+    s) SPEED="$OPTARG" ;;
+    t) CDTEXT="$OPTARG" ;;
+    n) DUMMY=1 ;;
+    g) GAPLESS=1 ;;
+    B) BLANK=1 ;;
+    T) NOTEXT=1 ;;
+    e) EJECT=1 ;;
+    h) usage ;;
+    :) die "option -$OPTARG needs a value" ;;
+    \?) die "unknown option -$OPTARG (try -h)" ;;
+  esac
+done
+shift $((OPTIND - 1))
+[[ $# -gt 0 ]] && STAGE="$1"
+
+# ---- gather staged tracks in order ------------------------------------------
+[[ -d "$STAGE" ]] || die "staging dir not found: $STAGE  (run cd-prep first)"
+mapfile -t TRACKS < <(find "$STAGE" -maxdepth 1 -name '*.wav' -type f -printf '%f\n' | sort)
+[[ ${#TRACKS[@]} -gt 0 ]] || die "no .wav files in $STAGE  (run cd-prep first)"
+
+# ---- CD-TEXT: use what cd-prep/cd-album staged, unless told otherwise -------
+if [[ $NOTEXT -eq 1 ]]; then
+  CDTEXT=""
+elif [[ -z "$CDTEXT" && -s "$STAGE/cdtext" ]]; then
+  CDTEXT=$(< "$STAGE/cdtext")
+  note "CD-TEXT from staging: ${CDTEXT/|/ — }   (-T to skip)"
+fi
+
+# ---- engine + tool check ----------------------------------------------------
+if [[ $GAPLESS -eq 1 || -n "$CDTEXT" ]]; then ENGINE=cdrdao; else ENGINE=cdrskin; fi
+if ! command -v "$ENGINE" >/dev/null; then
+  die "$ENGINE not installed. Run:
+       sudo rpm-ostree install --apply-live cdrskin cdrdao
+     (drop --apply-live and reboot if the live apply fails)"
+fi
+
+# ---- device check -----------------------------------------------------------
+[[ -b "$DEV" ]] || die "no such burner device: $DEV"
+[[ -r "$DEV" && -w "$DEV" ]] || die "no read/write access to $DEV
+     Your login normally gets this via a logind ACL; check: getfacl $DEV"
+
+# ---- verify every track really is Red Book ----------------------------------
+for t in "${TRACKS[@]}"; do
+  spec=$(ffprobe -v error -select_streams a:0 \
+           -show_entries stream=codec_name,sample_rate,channels \
+           -of csv=p=0 "$STAGE/$t" 2>/dev/null)
+  [[ "$spec" == "pcm_s16le,44100,2" ]] \
+    || die "not Red Book (got '$spec'): $t
+     Re-run cd-prep to convert it."
+done
+
+printf '\n  Device : %s\n  Engine : %s%s\n  Speed  : %sx\n  Tracks : %d\n' \
+  "$DEV" "$ENGINE" "$([[ $GAPLESS -eq 1 ]] && echo ' (gapless)')" "$SPEED" "${#TRACKS[@]}"
+[[ $DUMMY -eq 1 ]] && printf '  Mode   : DUMMY — laser stays off, nothing is written\n'
+printf '\n'
+i=0; for t in "${TRACKS[@]}"; do i=$((i+1)); printf '  %2d. %s\n' "$i" "$t"; done
+printf '\n'
+
+# ---- optionally blank a CD-RW ----------------------------------------------
+if [[ $BLANK -eq 1 ]]; then
+  note "Blanking rewritable media..."
+  cdrskin dev="$DEV" -v blank=fast || die "blanking failed"
+fi
+
+# ---- media preflight --------------------------------------------------------
+# cdrdao goes interactive ("hit return to reload disk") when it doubts the media,
+# which is fatal with no tty and impossible on a slim drive that cannot self-load
+# its tray. Settle the question here instead.
+if command -v cdrskin >/dev/null; then
+  # cdrskin exits non-zero when there is no usable disc, so swallow that here
+  # and judge on the reported status instead.
+  mstatus=$(cdrskin dev="$DEV" -atip 2>&1 | sed -n 's/^cdrskin: status \([0-9]\+\).*/\1/p' | head -1) || true
+  case "${mstatus:-x}" in
+    1) : ;;                     # blank, ready to write
+    2) die "no disc in the drive. Insert a blank CD-R and push the tray shut." ;;
+    *) die "the disc is not blank (cdrskin media status ${mstatus:-unknown}).
+     If the tray was just reloaded, give it a few seconds and retry.
+     For a CD-RW, erase it first:  cd-burn -B" ;;
+  esac
+fi
+
+# ---- burn -------------------------------------------------------------------
+cd "$STAGE"
+
+if [[ "$ENGINE" == cdrskin ]]; then
+  cmd=(cdrskin -v dev="$DEV" speed="$SPEED" -sao -audio -pad)
+  [[ $DUMMY -eq 1 ]] && cmd+=(-dummy)
+  [[ $EJECT -eq 1 ]] && cmd+=(-eject)
+  cmd+=("${TRACKS[@]}")
+  note "Running: ${cmd[*]}"
+  "${cmd[@]}"
+else
+  toc="$STAGE/album.toc"
+  esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+
+  { printf 'CD_DA\n\n'
+    if [[ -n "$CDTEXT" ]]; then
+      album="${CDTEXT%%|*}"; artist="${CDTEXT#*|}"
+      [[ "$artist" == "$CDTEXT" ]] && artist=""
+      printf 'CD_TEXT {\n  LANGUAGE_MAP { 0 : EN }\n  LANGUAGE 0 {\n'
+      printf '    TITLE "%s"\n' "$(esc "$album")"
+      printf '    PERFORMER "%s"\n' "$(esc "$artist")"
+      printf '  }\n}\n\n'
+    fi
+  } > "$toc"
+
+  i=0
+  for t in "${TRACKS[@]}"; do
+    i=$((i+1))
+    printf 'TRACK AUDIO\n' >> "$toc"
+    if [[ -n "$CDTEXT" ]]; then
+      # Track title/performer come from the cd-prep manifest when present.
+      title=$(awk -F'\t' -v n="$i" '$1==n{print $4}' tracks.tsv 2>/dev/null || true)
+      perf=$(awk  -F'\t' -v n="$i" '$1==n{print $5}' tracks.tsv 2>/dev/null || true)
+      [[ -n "$title" ]] || title="${t%.wav}"
+      printf 'CD_TEXT { LANGUAGE 0 { TITLE "%s" PERFORMER "%s" } }\n' \
+        "$(esc "$title")" "$(esc "$perf")" >> "$toc"
+    fi
+    # No PREGAP line => gapless. Add a 2s pause when gapless wasn't requested.
+    [[ $GAPLESS -eq 0 && $i -gt 1 ]] && printf 'PREGAP 00:02:00\n' >> "$toc"
+    printf 'FILE "%s" 0\n\n' "$t" >> "$toc"
+  done
+
+  note "TOC written: $toc"
+  cmd=(cdrdao write --device "$DEV" --speed "$SPEED" --driver generic-mmc -n)
+  [[ $DUMMY -eq 1 ]] && cmd+=(--simulate)
+  [[ $EJECT -eq 1 ]] && cmd+=(--eject)
+  cmd+=("$toc")
+  note "Running: ${cmd[*]}"
+  "${cmd[@]}"
+fi
+
+printf '\n  Done.%s\n\n' "$([[ $DUMMY -eq 1 ]] && echo ' (dummy run — no data was written)')"

@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# cd-album — turn a downloaded album folder into ready-to-burn audio CD(s).
+#
+# Works out the running order (track/disc tags when every file has them,
+# natural filename order otherwise), converts everything to Red Book via
+# cd-prep, and splits across multiple discs when the album is over ~80 minutes.
+#
+# Plays in any CD player, including old car head units. Source quality is
+# whatever the download was; see the clip-guard note in cd-prep.
+#
+# Usage:
+#   cd-album [options] DIR|FILE...
+#
+# Options:
+#   -o DIR   staging root                    (default: ~/cdburn)
+#   -p       preview the running order and exit, converting nothing
+#   -m       split across multiple discs if it does not fit on one
+#   -M MIN   minutes per disc                (default: 79.5)
+#   -g SEC   gap between tracks              (default: 2)
+#   -N       disable the clip guard (passed to cd-prep)
+#   -h       this help
+
+set -euo pipefail
+
+ROOT="${CDBURN_ROOT:-$HOME/cdburn}"
+MAXMIN=79.5
+GAP=2
+MULTI=0; PREVIEW=0; NOGUARD=0
+
+die()   { printf 'cd-album: %s\n' "$*" >&2; exit 1; }
+usage() { awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0; }
+hms()   { awk -v s="$1" 'BEGIN{printf "%d:%02d", int(s/60), int(s+0.5)%60}'; }
+
+while getopts ':o:M:g:pmNh' opt; do
+  case "$opt" in
+    o) ROOT="$OPTARG" ;;
+    M) MAXMIN="$OPTARG" ;;
+    g) GAP="$OPTARG" ;;
+    p) PREVIEW=1 ;;
+    m) MULTI=1 ;;
+    N) NOGUARD=1 ;;
+    h) usage ;;
+    :) die "option -$OPTARG needs a value" ;;
+    \?) die "unknown option -$OPTARG (try -h)" ;;
+  esac
+done
+shift $((OPTIND - 1))
+[[ $# -gt 0 ]] || die "no album folder given (try -h)"
+command -v cd-prep >/dev/null || die "cd-prep not found in PATH"
+
+AUDIO_RE='.*\.\(mp3\|flac\|m4a\|aac\|wav\|aiff\|aif\|ogg\|opus\|wma\)'
+MAXSEC=$(awk -v m="$MAXMIN" 'BEGIN{print m*60}')
+
+# ---- gather ------------------------------------------------------------------
+FILES=()
+for arg in "$@"; do
+  [[ -e "$arg" ]] || die "no such path: $arg"
+  if [[ -d "$arg" ]]; then
+    while IFS= read -r f; do FILES+=("$f"); done \
+      < <(find "$arg" -type f -iregex "$AUDIO_RE" | LC_ALL=C sort)
+  else
+    FILES+=("$arg")
+  fi
+done
+[[ ${#FILES[@]} -gt 0 ]] || die "no audio files found"
+for f in "${FILES[@]}"; do
+  [[ "$f" == *$'\n'* ]] && die "filename contains a newline; rename it first: $f"
+done
+
+tag() { ffprobe -v error -show_entries "format_tags=$1" -of default=nw=1:nk=1 "$2" 2>/dev/null | head -1; }
+num() { printf '%s' "${1%%/*}" | tr -cd '0-9'; }   # "3/9" -> 3
+
+# ---- decide running order ----------------------------------------------------
+tagged=0
+for f in "${FILES[@]}"; do [[ -n "$(num "$(tag track "$f")")" ]] && tagged=$((tagged + 1)); done
+
+if [[ $tagged -eq ${#FILES[@]} ]]; then
+  ORDER_BY="track/disc tags"
+  mapfile -t FILES < <(
+    for f in "${FILES[@]}"; do
+      d=$(num "$(tag disc "$f")"); [[ -n "$d" ]] || d=1
+      t=$(num "$(tag track "$f")")
+      printf '%d\t%d\t%s\n' "$d" "$t" "$f"
+    done | sort -k1,1n -k2,2n | cut -f3-
+  )
+else
+  ORDER_BY="filename order ($tagged of ${#FILES[@]} files carry track tags)"
+  mapfile -t FILES < <(printf '%s\n' "${FILES[@]}" | sort -V)
+fi
+
+# ---- durations ---------------------------------------------------------------
+DURS=(); total=0
+for f in "${FILES[@]}"; do
+  d=$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$f" 2>/dev/null)
+  [[ "$d" =~ ^[0-9.]+$ ]] || die "cannot read duration of: $f"
+  DURS+=("$d")
+  total=$(awk -v a="$total" -v b="$d" 'BEGIN{print a+b}')
+done
+
+alb=$(tag album "${FILES[0]}"); art=$(tag artist "${FILES[0]}")
+printf '\n  Album  : %s\n  Artist : %s\n  Order  : %s\n  Tracks : %d, %s of audio\n\n' \
+  "${alb:-(untagged)}" "${art:-(untagged)}" "$ORDER_BY" "${#FILES[@]}" "$(hms "$total")"
+
+# ---- partition into discs ----------------------------------------------------
+DISC_OF=(); disc=1; acc=0
+for i in "${!FILES[@]}"; do
+  d="${DURS[$i]}"
+  awk -v d="$d" -v m="$MAXSEC" 'BEGIN{exit !(d > m)}' \
+    && die "track $((i+1)) alone is longer than one disc: ${FILES[$i]}"
+  add=$(awk -v a="$acc" -v d="$d" -v g="$GAP" 'BEGIN{print (a>0) ? a+g+d : d}')
+  if awk -v a="$add" -v m="$MAXSEC" 'BEGIN{exit !(a > m)}'; then
+    disc=$((disc + 1)); acc="$d"
+  else
+    acc="$add"
+  fi
+  DISC_OF+=("$disc")
+done
+NDISCS=$disc
+
+if [[ $NDISCS -gt 1 && $MULTI -eq 0 ]]; then
+  die "this needs $NDISCS discs (${MAXMIN} min each). Re-run with -m to split it."
+fi
+
+# ---- show the plan -----------------------------------------------------------
+cur=0
+for i in "${!FILES[@]}"; do
+  if [[ "${DISC_OF[$i]}" != "$cur" ]]; then
+    cur="${DISC_OF[$i]}"
+    [[ $NDISCS -gt 1 ]] && printf '  --- Disc %d ---\n' "$cur"
+  fi
+  printf '  %2d. %-58.58s %6s\n' "$((i+1))" "$(basename "${FILES[$i]}")" "$(hms "${DURS[$i]}")"
+done
+printf '\n'
+
+if [[ $PREVIEW -eq 1 ]]; then
+  printf '  Preview only (-p). Nothing was converted.\n\n'
+  exit 0
+fi
+
+# ---- stage each disc through cd-prep -----------------------------------------
+mkdir -p "$ROOT"
+PREP_OPTS=(-g "$GAP"); [[ $NOGUARD -eq 1 ]] && PREP_OPTS+=(-N)
+OUTDIRS=()
+
+for ((d = 1; d <= NDISCS; d++)); do
+  if [[ $NDISCS -eq 1 ]]; then outdir="$ROOT/staging"; else outdir="$ROOT/disc$d"; fi
+  pl="$ROOT/.album-disc$d.txt"
+  : > "$pl"
+  for i in "${!FILES[@]}"; do
+    [[ "${DISC_OF[$i]}" == "$d" ]] && printf '%s\n' "${FILES[$i]}" >> "$pl"
+  done
+  [[ $NDISCS -gt 1 ]] && printf '  ================ Disc %d of %d ================\n' "$d" "$NDISCS"
+  cd-prep "${PREP_OPTS[@]}" -o "$outdir" -l "$pl"
+  rm -f "$pl"
+  OUTDIRS+=("$outdir")
+done
+
+# ---- what to do next ---------------------------------------------------------
+printf '  Ready to burn:\n\n'
+if [[ $NDISCS -eq 1 ]]; then
+  printf '    cd-burn -n       # rehearsal\n    cd-burn -e       # burn and eject\n\n'
+else
+  for d in "${!OUTDIRS[@]}"; do
+    printf '    cd-burn -e %s      # disc %d of %d\n' "${OUTDIRS[$d]}" "$((d+1))" "$NDISCS"
+  done
+  printf '\n'
+fi

@@ -110,6 +110,19 @@ else
     print_success "No power-profiles-daemon — bar omits the power profile module"
 fi
 
+# User commands on PATH.
+#
+# ~/.local/bin, not /usr/local/bin: both shells already put it on PATH, it needs
+# no sudo, and on an rpm-ostree host /usr/local is the one writable place that
+# is NOT carried across a rebase, so a system-wide link would quietly vanish.
+#
+# Globbed rather than listed, so a new script in bin/ is linked by re-running
+# this — there is nothing to remember to update here.
+for bin_file in "$DOTFILES_DIR"/bin/*; do
+    [ -f "$bin_file" ] || continue
+    link_file "$bin_file" "$HOME/.local/bin/$(basename "$bin_file")"
+done
+
 # Git
 link_file "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 
