@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Set the desktop background, with fallbacks.
 #
-# The config used a bare `output * bg $HOME/.dotfiles/wallpapers/moon.jpg fill`.
+# The config used a bare `output * bg $HOME/.dotfiles/wallpapers/fire.jpg fill`.
 # Sway does expand $HOME, but if the file is missing for any reason the
 # directive fails and sway is left with no background and no recovery. This
 # resolves the path from the script's own location (so it works regardless of
@@ -18,10 +18,10 @@ self="$(readlink -f "${BASH_SOURCE[0]}")"
 repo="$(cd "$(dirname "$self")/../.." 2>/dev/null && pwd)" || repo=""
 
 candidates=()
-[ -n "$repo" ] && candidates+=("$repo/wallpapers/moon.jpg")
+[ -n "$repo" ] && candidates+=("$repo/wallpapers/fire.jpg")
 candidates+=(
-    "${DOTFILES_DIR:-$HOME/.dotfiles}/wallpapers/moon.jpg"
-    "$HOME/.dotfiles/wallpapers/moon.jpg"
+    "${DOTFILES_DIR:-$HOME/.dotfiles}/wallpapers/fire.jpg"
+    "$HOME/.dotfiles/wallpapers/fire.jpg"
     /usr/share/backgrounds/default-dark.jxl
     /usr/share/backgrounds/default.jxl
 )
