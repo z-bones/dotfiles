@@ -29,8 +29,17 @@ set $menu $rofi_cmd -show combi -combi-modes drun#run -modes combi
 
 
 ### Appearance
-gaps inner 2
-gaps outer 2
+# `gaps` in this form is config-time: sway copies these values into a workspace
+# when that workspace is CREATED. `swaymsg reload` re-reads the config and
+# updates the defaults, but does NOT push them onto workspaces that already
+# exist — those keep the value they were born with. So changing a number here
+# and reloading looks like it silently did nothing, while a freshly created
+# workspace picks up the new value, leaving the session inconsistent.
+#
+# To apply a change to the running session, use the runtime form as well:
+#   swaymsg 'gaps inner all set 0' && swaymsg 'gaps outer all set 0'
+gaps inner 0
+gaps outer 0
 
 # Remove title bars
 default_border none
