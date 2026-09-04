@@ -270,6 +270,10 @@ bindsym $mod+r mode "resize"
 include /etc/sway/config.d/*.conf
 include $HOME/.config/sway/config.d/*.conf
 
+# Screenshot bindings using grimshot
+bindsym --to-code Mod1+Shift+3 exec grimshot --notify savecopy screen
+bindsym --to-code Mod1+Shift+4 exec grimshot --notify savecopy area
+
 ### Status Bar: waybar
 #
 # Declared HERE, in the main config, rather than in config.d — the include
