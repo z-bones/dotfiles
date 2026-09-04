@@ -71,11 +71,29 @@ detect_arch() {
 # Reading */type and matching "Battery" is naming-independent — it is the
 # documented power_supply class ABI, and it also excludes the AC adapter and
 # the USB-C PD controllers, which sit in the same directory.
+#
+# But type alone is not enough, and the failure runs the other way. A wireless
+# peripheral reports its own charge through the same class: a Logitech mouse
+# shows up as "hidpp_battery_0" with type "Battery", so a desktop with a
+# Logitech receiver was detected as a laptop and got laptop.conf — caps remapped
+# to ctrl, touchpad settings, a lid binding. Worse, those batteries appear and
+# vanish as the device sleeps and wakes, so the answer changed between runs of
+# the same script.
+#
+# `scope` is the discriminator: "Device" means the battery powers that
+# peripheral, "System" means it powers the machine. It is optional in the ABI,
+# so a missing scope counts as a system battery — that is the conservative
+# reading, and it is what the Apple SMC battery does.
 has_battery() {
-    local type_file
+    local type_file scope_file
     for type_file in /sys/class/power_supply/*/type; do
         [ -r "$type_file" ] || continue
-        [ "$(cat "$type_file")" = "Battery" ] && return 0
+        [ "$(cat "$type_file")" = "Battery" ] || continue
+
+        scope_file="${type_file%/type}/scope"
+        [ -r "$scope_file" ] && [ "$(cat "$scope_file")" = "Device" ] && continue
+
+        return 0
     done
     return 1
 }
