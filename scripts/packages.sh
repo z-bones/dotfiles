@@ -40,7 +40,8 @@ ARCH_EXTRA=(python-pynvim tailscale)
 # but on a GNOME install with sway added by hand none of them exist.
 #   foot        - terminal launched by config/sway/startup.sh
 #   rofi        - $menu launcher bound in config/sway/config
-#   waybar      - the bar, launched by config.d/90-bar.conf
+#   waybar      - the bar, declared in config/sway/config (config.d/90-bar.conf
+#                 is the empty file that neutralises the distro's own bar)
 #   pavucontrol - waybar's pulseaudio on-click handler
 #   wireplumber - provides wpctl, used by the volume keys in laptop.conf
 # swaymsg and swaynag come from sway itself, which must already be installed

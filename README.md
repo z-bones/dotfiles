@@ -88,6 +88,7 @@ dotfiles/
 │   │   ├── startup.sh      # Session startup layout
 │   │   └── config.d/       # Drop-ins (laptop, android-emulator)
 │   ├── waybar/             # Status bar config + styles
+│   │                       # modules-right{,.ppd}.jsonc — host-gated drop-ins
 │   ├── vscode/
 │   │   └── extensions.txt  # VS Code/Cursor extensions list
 │   └── starship.toml       # Prompt config
@@ -157,6 +158,19 @@ The battery test is `has_battery()` in `lib.sh`, which scans
 `BAT0` is an ACPI convention: Apple Silicon names its battery `macsmc-battery`,
 so the old glob silently skipped `laptop.conf` on the MacBook and left the
 brightness keys, lid switch and idle lock dead.
+
+`power-profiles-daemon` needs different handling: Waybar does *not* self-disable
+it, and logs a hard error on every start where the daemon is missing. So the
+whole `modules-right` list lives in a drop-in with two variants —
+`config/waybar/modules-right.jsonc` (baseline) and `modules-right.ppd.jsonc`
+(adds the module) — and `symlinks.sh` links whichever fits to
+`~/.config/waybar/modules-right.jsonc`, keyed on `powerprofilesctl` being on
+PATH. Packages install before symlinks, so that check sees the final state.
+
+The list has to live in the drop-in rather than in `config.jsonc`: Waybar takes
+the *first* definition of a duplicate key and the including file wins, so a
+`modules-right` in `config.jsonc` could never be overridden by an include.
+Keep the two variants in sync when adding or reordering modules.
 
 ## Make Commands
 

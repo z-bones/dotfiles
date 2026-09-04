@@ -1,0 +1,26 @@
+// -*- mode: jsonc -*-
+//
+// modules-right for hosts WITH power-profiles-daemon installed. Linked to
+// ~/.config/waybar/modules-right.jsonc by symlinks.sh when powerprofilesctl is
+// on PATH. Identical to modules-right.jsonc but for the extra entry below.
+//
+// See modules-right.jsonc for why this list is a drop-in at all. Keep both
+// variants in sync when adding or reordering modules.
+{
+    "modules-right": [
+        "idle_inhibitor",
+        "pulseaudio",
+        "network",
+        // The gated module. Absent from the baseline variant because waybar
+        // logs a hard [error] on every start when the daemon is not running.
+        "power-profiles-daemon",
+        "backlight",
+        "battery",
+        // "cpu",
+        // "memory",
+        // "temperature",
+        // "sway/language",
+        "clock",
+        "tray"
+    ]
+}

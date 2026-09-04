@@ -77,6 +77,21 @@ fi
 link_file "$DOTFILES_DIR/config/waybar/config.jsonc" "$HOME/.config/waybar/config.jsonc"
 link_file "$DOTFILES_DIR/config/waybar/style.css" "$HOME/.config/waybar/style.css"
 
+# modules-right is a drop-in so power-profiles-daemon can be gated. Unlike
+# backlight and battery — which waybar disables by itself when the hardware is
+# absent — the power-profiles module logs a hard error on every start when the
+# daemon is missing. powerprofilesctl ships with the daemon, so it is the tell.
+# Packages are installed before this script runs, so this sees the final state.
+# Exactly one variant is linked, which keeps waybar from warning about a
+# missing include file.
+if command -v powerprofilesctl &> /dev/null; then
+    link_file "$DOTFILES_DIR/config/waybar/modules-right.ppd.jsonc" "$HOME/.config/waybar/modules-right.jsonc"
+    print_success "power-profiles-daemon found — bar includes the power profile module"
+else
+    link_file "$DOTFILES_DIR/config/waybar/modules-right.jsonc" "$HOME/.config/waybar/modules-right.jsonc"
+    print_success "No power-profiles-daemon — bar omits the power profile module"
+fi
+
 # Git
 link_file "$DOTFILES_DIR/git/.gitconfig" "$HOME/.gitconfig"
 

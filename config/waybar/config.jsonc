@@ -14,22 +14,19 @@
     "modules-center": [
         "sway/window"
     ],
-    // backlight and battery are laptop-only. Waybar disables a module whose
-    // hardware is absent (logs a warning and carries on), so leaving them in
-    // is safe on the desktop and saves maintaining two configs.
-    "modules-right": [
-        "idle_inhibitor",
-        "pulseaudio",
-        "network",
-        "power-profiles-daemon",
-        "backlight",
-        "battery",
-        // "cpu",
-        // "memory",
-        // "temperature",
-        // "sway/language",
-        "clock",
-        "tray"
+    // modules-right is NOT defined here — it comes from the drop-in below.
+    //
+    // backlight and battery can be declared unconditionally, because waybar
+    // disables a module whose hardware is absent and carries on.
+    // power-profiles-daemon cannot: it logs a hard [error] on every start where
+    // the daemon is missing, so it has to be gated per host. symlinks.sh links
+    // either modules-right.jsonc or modules-right.ppd.jsonc to the path below.
+    //
+    // The list has to live in the include rather than here. Waybar takes the
+    // first definition of a duplicate key and the including file always wins,
+    // so a modules-right in this file could never be overridden by a drop-in.
+    "include": [
+        "~/.config/waybar/modules-right.jsonc"
     ],
     // Modules configuration
     // "sway/workspaces": {
@@ -151,6 +148,9 @@
     "battery#bat2": {
         "bat": "BAT2"
     },
+    // Settings for the gated module. Safe to keep here unconditionally — waybar
+    // ignores the config of a module that modules-right does not list — which
+    // saves duplicating this block into both modules-right variants.
     "power-profiles-daemon": {
       "format": "{icon}",
       "tooltip-format": "Power profile: {profile}\nDriver: {driver}",

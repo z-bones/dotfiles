@@ -1,0 +1,33 @@
+// -*- mode: jsonc -*-
+//
+// Baseline modules-right. Linked to ~/.config/waybar/modules-right.jsonc on
+// hosts WITHOUT power-profiles-daemon. The .ppd variant beside this file is
+// identical but for the power-profiles-daemon entry; symlinks.sh links exactly
+// one of the two to that path, so waybar never warns about a missing include.
+//
+// This list lives in a drop-in rather than in config.jsonc because waybar
+// resolves duplicate keys first-definition-wins, and the including file counts
+// as first. A modules-right defined in config.jsonc could never be overridden
+// by an include, which is the whole point of the split.
+//
+// Keep both variants in sync when adding or reordering modules.
+{
+    // backlight and battery are laptop-only and stay in BOTH variants: waybar
+    // disables a module whose hardware is absent, logging a warning and
+    // carrying on. power-profiles-daemon gets no such treatment — it logs a
+    // hard [error] on every start when the daemon is missing, which is exactly
+    // why it is gated here rather than left in unconditionally.
+    "modules-right": [
+        "idle_inhibitor",
+        "pulseaudio",
+        "network",
+        "backlight",
+        "battery",
+        // "cpu",
+        // "memory",
+        // "temperature",
+        // "sway/language",
+        "clock",
+        "tray"
+    ]
+}
