@@ -86,7 +86,9 @@ dotfiles/
 │   ├── sway/
 │   │   ├── config          # Sway WM config
 │   │   ├── startup.sh      # Session startup layout
-│   │   └── config.d/       # Drop-ins (laptop, android-emulator)
+│   │   ├── polkit-agent.sh # Probes for the host's polkit agent
+│   │   └── config.d/       # Drop-ins — 10-lock, 20-keys-media, 30-rules,
+│   │                       # 40-autostart (all hosts), laptop.conf (gated)
 │   ├── waybar/             # Status bar config + styles
 │   │                       # modules-right{,.ppd}.jsonc — host-gated drop-ins
 │   ├── vscode/
@@ -145,19 +147,54 @@ than failing the run:
 Zen Browser, Obsidian, Audacity and Raspberry Pi Imager all publish `aarch64`
 Flatpaks, so the desktop apps come across intact.
 
+## Sway Drop-ins
+
+The main config includes `/etc/sway/config.d` and `~/.config/sway/config.d` with
+sway's own glob include, and deliberately does **not** include
+`/usr/share/sway/config.d`. That directory only has contents when
+`sway-config-fedora` is installed, and reading it means every binding has two
+possible owners — the distro's copy and ours.
+
+The cost is that on a Fedora Sway spin those drop-ins were doing real work
+nothing else does. They are ported into our own numbered drop-ins, so both hosts
+get them whether or not the distro ever shipped them:
+
+| Drop-in | Replaces | Provides |
+| --- | --- | --- |
+| `10-lock.conf` | `90-swayidle.conf` | `$lock`, swayidle, `loginctl lock-session` |
+| `20-keys-media.conf` | `60-bindings-{volume,media}.conf` | Volume keys (wpctl), playback keys (playerctl) |
+| `30-rules.conf` | `50-rules-*.conf` | Browser idle-inhibit, floating dialogs |
+| `40-autostart.conf` | `95-*.conf` | Polkit agent, XDG autostart, user dirs |
+
+The numeric prefixes are load order, not decoration. The include is a glob and
+sway loads matches sorted, so `10-lock.conf` defines `$lock` before
+`laptop.conf`'s lid binding uses it.
+
+Every `exec` in `40-autostart.conf` is guarded, because the host it runs on may
+never have had the package the distro drop-in assumed. The polkit agent is the
+awkward one — it is `lxqt-policykit-agent` on the Sway spin and the KDE agent on
+Plasma — so `config/sway/polkit-agent.sh` probes a candidate list instead of
+installing one and hardcoding it.
+
 ## Laptop vs Desktop
 
-`config/sway/config.d/laptop.conf` holds touchpad, lid-switch, idle-lock,
-brightness and keyboard-backlight settings. `symlinks.sh` links it only when the
-host has a battery, so one branch serves both machines. Waybar's `backlight` and
-`battery` modules are always declared — Waybar disables a module whose hardware
-is absent.
+`config/sway/config.d/laptop.conf` holds touchpad, lid-switch, screen-brightness
+and keyboard-backlight settings. `symlinks.sh` links it only when the host has a
+battery, so one branch serves both machines. Screen locking and the volume and
+media keys are **not** in it — a desktop wants both, and two drop-ins declaring
+`exec swayidle` would start two daemons. Waybar's `backlight` and `battery`
+modules are always declared — Waybar disables a module whose hardware is absent.
 
 The battery test is `has_battery()` in `lib.sh`, which scans
-`/sys/class/power_supply/*/type` for `Battery` rather than globbing for `BAT*`.
-`BAT0` is an ACPI convention: Apple Silicon names its battery `macsmc-battery`,
-so the old glob silently skipped `laptop.conf` on the MacBook and left the
-brightness keys, lid switch and idle lock dead.
+`/sys/class/power_supply/*/type` for `Battery` rather than globbing for `BAT*`,
+and then skips anything whose `scope` is `Device`. Both halves are needed, and
+they fail in opposite directions. `BAT0` is an ACPI convention: Apple Silicon
+names its battery `macsmc-battery`, so the glob silently skipped `laptop.conf`
+on the MacBook. But a bare type check is worse — a Logitech mouse reports
+`hidpp_battery_0` with type `Battery`, so the desktop was detected as a laptop,
+and because those batteries come and go as the device sleeps, the answer changed
+between runs of the same script. `scope` is what separates a battery that powers
+the machine from one that powers a peripheral.
 
 `power-profiles-daemon` needs different handling: Waybar does *not* self-disable
 it, and logs a hard error on every start where the daemon is missing. So the

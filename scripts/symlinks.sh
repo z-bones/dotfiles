@@ -54,16 +54,34 @@ link_file "$DOTFILES_DIR/config/starship.toml" "$HOME/.config/starship.toml"
 link_file "$DOTFILES_DIR/config/sway/config" "$HOME/.config/sway/config"
 link_file "$DOTFILES_DIR/config/sway/startup.sh" "$HOME/.config/sway/startup.sh"
 link_file "$DOTFILES_DIR/config/sway/wallpaper.sh" "$HOME/.config/sway/wallpaper.sh"
+link_file "$DOTFILES_DIR/config/sway/polkit-agent.sh" "$HOME/.config/sway/polkit-agent.sh"
 # Drop-ins, picked up by the config.d include at the bottom of config
 if command -v sway &> /dev/null; then
+    # Universal drop-ins. These carry what /usr/share/sway/config.d used to
+    # supply on a Fedora Sway spin — the main config no longer includes that
+    # directory, so without these the idle lock, the volume and media keys, the
+    # polkit agent and XDG autostart are all simply absent. Every one of them is
+    # guarded internally, so they are equally correct on a host that never had
+    # the distro drop-ins at all.
+    #
+    # The numeric prefixes are load order, not decoration: the include is a glob
+    # and sway loads matches in sorted order, so 10-lock.conf defines $lock
+    # before laptop.conf's lid binding uses it.
+    link_file "$DOTFILES_DIR/config/sway/config.d/10-lock.conf" "$HOME/.config/sway/config.d/10-lock.conf"
+    link_file "$DOTFILES_DIR/config/sway/config.d/20-keys-media.conf" "$HOME/.config/sway/config.d/20-keys-media.conf"
+    link_file "$DOTFILES_DIR/config/sway/config.d/30-rules.conf" "$HOME/.config/sway/config.d/30-rules.conf"
+    link_file "$DOTFILES_DIR/config/sway/config.d/40-autostart.conf" "$HOME/.config/sway/config.d/40-autostart.conf"
+
     link_file "$DOTFILES_DIR/config/sway/config.d/android-emulator.conf" "$HOME/.config/sway/config.d/android-emulator.conf"
-    # Must keep the 90-bar.conf name — layered-include matches on basename, so
-    # this replaces the distro drop-in instead of adding a second bar.
+    # Inert now that /usr/share/sway/config.d is not included — see the note in
+    # the file itself. The name must stay 90-bar.conf regardless: it is only
+    # ever an override by basename.
     link_file "$DOTFILES_DIR/config/sway/config.d/90-bar.conf" "$HOME/.config/sway/config.d/90-bar.conf"
 
-    # Touchpad, lid switch, idle-lock and brightness keys only make sense on a
-    # laptop. A battery under /sys/class/power_supply is the portable tell —
-    # see has_battery() in lib.sh for why this is not a BAT* glob.
+    # Touchpad, lid switch, brightness and keyboard-backlight keys only make
+    # sense on a laptop. A battery under /sys/class/power_supply is the portable
+    # tell — see has_battery() in lib.sh for why this is neither a BAT* glob nor
+    # a bare type check.
     if has_battery; then
         link_file "$DOTFILES_DIR/config/sway/config.d/laptop.conf" "$HOME/.config/sway/config.d/laptop.conf"
         print_success "Laptop detected — linked laptop.conf"

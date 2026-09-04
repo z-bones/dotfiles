@@ -242,6 +242,14 @@ mode "resize" {
 }
 bindsym $mod+r mode "resize"
 
+# Passthrough mode: swallow every binding except the one that leaves again, so
+# a nested compositor or a VM can receive $mod combinations sway would otherwise
+# eat. Ported from /usr/share/sway/config.d/65-mode-passthrough.conf.
+mode "passthrough" {
+    bindsym $mod+Pause mode default
+}
+bindsym $mod+Pause mode "passthrough"
+
 # Include drop-ins from two locations, using sway's own glob include.
 #
 #  - /etc/sway/config.d          system integration (sway-systemd)
@@ -262,17 +270,37 @@ bindsym $mod+r mode "resize"
 # Installing sway-config-fedora is the other possible fix, and it is the wrong
 # one here: it also drops 60-bindings-brightness.conf, 60-bindings-volume.conf
 # and 90-swayidle.conf into /usr/share/sway/config.d, which duplicate bindings
-# config.d/laptop.conf already defines and start a SECOND swayidle — so every
-# idle timeout would fire two swaylocks. Not loading /usr/share at all keeps one
-# owner for each binding, whether or not that package is ever installed.
+# config.d/laptop.conf and config.d/20-keys-media.conf already define and start
+# a SECOND swayidle alongside config.d/10-lock.conf — so every idle timeout
+# would fire two swaylocks. Not loading /usr/share at all keeps one owner for
+# each binding, whether or not that package is ever installed.
+#
+# The cost of that choice is real, and is paid in config.d: on a Fedora Sway
+# spin those drop-ins were doing work nothing else does — the idle lock, the
+# volume and media keys, the polkit agent, XDG autostart. Dropping the include
+# without replacing them would have left that host never locking its screen and
+# with dead volume keys. They are ported into our own numbered drop-ins
+# (10-lock, 20-keys-media, 30-rules, 40-autostart), guarded so they run on a
+# host that never had them. Nothing here relies on /usr/share existing.
 #
 # Order matters: later files override earlier ones, so ours land last.
 include /etc/sway/config.d/*.conf
 include $HOME/.config/sway/config.d/*.conf
 
-# Screenshot bindings using grimshot
+# Screenshot bindings using grimshot (grimshot ships in packages.sh).
+#
+# savecopy writes the file AND puts it on the clipboard, so a screenshot can be
+# pasted straight into a chat without going hunting for the file.
 bindsym --to-code Mod1+Shift+3 exec grimshot --notify savecopy screen
 bindsym --to-code Mod1+Shift+4 exec grimshot --notify savecopy area
+
+# The Print key, ported from /usr/share/sway/config.d/60-bindings-screenshot.conf
+# so the muscle memory from the Sway spin keeps working. Kept alongside the
+# macOS-style bindings above rather than replacing them: the Apple keyboard on
+# the laptop has no Print key at all.
+bindsym Print      exec grimshot --notify savecopy output
+bindsym Alt+Print  exec grimshot --notify savecopy active
+bindsym Ctrl+Print exec grimshot --notify savecopy area
 
 ### Status Bar: waybar
 #

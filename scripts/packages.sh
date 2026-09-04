@@ -33,19 +33,35 @@ DEBIAN_EXTRA=(python3-pynvim)
 FEDORA_EXTRA=(python3-neovim tailscale)
 ARCH_EXTRA=(python-pynvim tailscale)
 
-# Sway session extras. Referenced by config.d/laptop.conf (brightness keys,
-# idle-lock) and by the volume bindings, so install them wherever sway runs.
 # Sway session extras. Everything our configs actually invoke, because none of
 # it can be assumed present: on Fedora Sway Atomic these ship in the base image,
-# but on a GNOME install with sway added by hand none of them exist.
-#   foot        - terminal launched by config/sway/startup.sh
-#   rofi        - $menu launcher bound in config/sway/config
-#   waybar      - the bar, declared in config/sway/config (config.d/90-bar.conf
-#                 is the empty file that neutralises the distro's own bar)
-#   pavucontrol - waybar's pulseaudio on-click handler
-#   wireplumber - provides wpctl, used by the volume keys in laptop.conf
+# but on a Plasma or GNOME install with sway added by hand none of them exist.
+#
+# This list got longer when the sway config stopped including
+# /usr/share/sway/config.d. Those distro drop-ins came with their package
+# dependencies; our replacements in config.d have to name them here instead.
+#   foot          - terminal launched by config/sway/startup.sh
+#   rofi          - $menu launcher bound in config/sway/config
+#   waybar        - the bar, declared in config/sway/config
+#   pavucontrol   - waybar's pulseaudio on-click handler
+#   brightnessctl - screen and keyboard backlight keys in config.d/laptop.conf
+#   swayidle      - the idle lock in config.d/10-lock.conf
+#   swaylock      - what swayidle and the lid binding actually run
+#   wireplumber   - provides wpctl, the volume keys in config.d/20-keys-media.conf
+#   playerctl     - the media keys in config.d/20-keys-media.conf
+#   grimshot      - the screenshot bindings in config/sway/config
+#   xdg-user-dirs - provides xdg-user-dirs-update, run by config.d/40-autostart.conf
 # swaymsg and swaynag come from sway itself, which must already be installed
 # for this list to be used at all.
+#
+# grimshot is the one name here that is not universal — it is its own package on
+# Fedora but lives in sway-contrib elsewhere. pm_install retries package by
+# package on failure, so a miss costs a warning, not the rest of the list.
+#
+# No polkit agent is listed. Which one is right depends on the desktop the host
+# already has (lxqt on the Sway spin, kde on Plasma) and installing the wrong
+# one drags in half of another desktop; config/sway/polkit-agent.sh probes for
+# whichever is present instead.
 SWAY_PACKAGES=(
     foot
     rofi
@@ -55,6 +71,9 @@ SWAY_PACKAGES=(
     swayidle
     swaylock
     wireplumber
+    playerctl
+    grimshot
+    xdg-user-dirs
 )
 
 # Flatpak apps to install
