@@ -4,7 +4,7 @@
 }
 
 window#waybar {
-    background-color: rgba(8, 18, 39, 0.5);
+    background-color: #080611;
     border-bottom: 0px solid rgba(100, 114, 125, 0.5);
     color: #ffffff;
     transition-property: background-color;
@@ -62,8 +62,10 @@ button:hover {
     background: rgba(0, 0, 0, 0.2);
 }
 
+/* Focus is signalled by the underline alone — no filled block, so the
+   workspace buttons sit visually level with the rest of the bar. */
 #workspaces button.focused {
-    background-color: #64727D;
+    background-color: transparent;
     box-shadow: inset 0 -3px #0fccf2;
 }
 
@@ -194,26 +196,27 @@ label:focus {
 }
 
 #wireplumber {
-    background-color: #fff0f5;
-    color: #000000;
+    background-color: transparent;
 }
 
 #wireplumber.muted {
-    background-color: #f53c3c;
+    background-color: transparent;
+    color: #90b1b1;
 }
 
 #custom-media {
-    background-color: #66cc99;
-    color: #2a5c45;
+    background-color: transparent;
     min-width: 100px;
 }
 
+/* The player is signalled by text colour rather than a filled block, so the
+   module keeps the same weight as its neighbours whatever is playing. */
 #custom-media.custom-spotify {
-    background-color: #66cc99;
+    color: #66cc99;
 }
 
 #custom-media.custom-vlc {
-    background-color: #ffa000;
+    color: #ffa000;
 }
 
 #temperature {
@@ -248,20 +251,20 @@ label:focus {
 }
 
 #mpd {
-    background-color: #66cc99;
-    color: #2a5c45;
+    background-color: transparent;
+    color: #66cc99;
 }
 
 #mpd.disconnected {
-    background-color: #f53c3c;
+    color: #f53c3c;
 }
 
 #mpd.stopped {
-    background-color: #90b1b1;
+    color: #90b1b1;
 }
 
 #mpd.paused {
-    background-color: #51a37a;
+    color: #51a37a;
 }
 
 #language {
